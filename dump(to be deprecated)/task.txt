@@ -1,0 +1,203 @@
+🏗️ System Architecture for All-in-One Auto Scrum Platform
+🔹 1. Video Meeting Module
+
+Built-in video conferencing (instead of Zoom/Meet).
+
+Features:
+
+Live transcription.
+
+Speaker diarization (who is speaking).
+
+Meeting recording + playback.
+
+Tech stack:
+
+WebRTC → core for real-time video/audio.
+
+Mediasoup / Janus / Jitsi SDK → scalable SFU (selective forwarding unit).
+
+OpenAI Whisper / Vosk → real-time speech-to-text.
+
+FastAPI / Node.js → signaling server.
+
+🔹 2. Real-Time Transcription & NLP Engine
+
+Converts conversation into structured Scrum artifacts:
+
+Tasks (“Riya will test login API”).
+
+Blockers (“We’re waiting on API docs”).
+
+Decisions (“We’ll use Mongo instead of Postgres”).
+
+Tech stack:
+
+Whisper (speech → text).
+
+Hugging Face Transformers (NER, summarization) → extract tasks, deadlines, assignees.
+
+spaCy → entity recognition (names, dates, actions).
+
+LangChain → chaining prompts/models if using LLMs.
+
+🔹 3. Kanban Board (Native, not Trello)
+
+Integrated task board with drag-and-drop.
+
+Auto-populated from meeting insights.
+
+Features:
+
+Columns: To Do, In Progress, Done.
+
+Task cards with assignee, deadline, priority.
+
+Sprint grouping.
+
+Tech stack:
+
+Frontend: React + TailwindCSS + DnD library (e.g., react-beautiful-dnd).
+
+Backend: FastAPI/Node + PostgreSQL (task management).
+
+WebSockets (Socket.IO) → real-time updates across users.
+
+🔹 4. Sprint Planning & Automation
+
+Auto-create sprint backlog from tasks.
+
+Effort estimation with ML.
+
+Auto-assign tasks based on:
+
+Member workload.
+
+Historical velocity.
+
+Skillset.
+
+Tech stack:
+
+ML Models (scikit-learn, PyTorch, TensorFlow).
+
+Historical sprint data → training for story point prediction.
+
+Optimization algorithm for fair workload distribution.
+
+🔹 5. Project Monitoring & Analytics
+
+Real-time dashboards:
+
+Sprint velocity.
+
+Burndown charts.
+
+Blocker tracking.
+
+Team participation heatmap (who speaks, who doesn’t).
+
+Tech stack:
+
+Recharts / D3.js for graphs.
+
+Postgres/MongoDB for historical data.
+
+Celery + Redis for background analytics jobs.
+
+🔹 6. Collaboration Features
+
+Chat + file sharing inside platform.
+
+Meeting notes auto-summarized.
+
+Notifications:
+
+In-app.
+
+Email/Slack integration.
+
+Tech stack:
+
+Socket.IO → real-time chat.
+
+MinIO / Firebase Storage / S3 → file storage.
+
+NLP summarization → meeting notes.
+
+🔹 7. Authentication & Security
+
+User roles: Scrum Master, Developer, Manager.
+
+SSO (Google/Microsoft login).
+
+Role-based permissions (only Scrum Master can close sprints).
+
+Tech stack:
+
+JWT tokens.
+
+OAuth2 (Google, Microsoft).
+
+RBAC (Role-Based Access Control).
+
+🔹 8. Deployment & Scalability
+
+Docker + Kubernetes for containerized microservices.
+
+Load balancing for meetings (SFU scaling).
+
+Cloud: AWS (EKS, S3, RDS) or GCP (GKE, Cloud Storage, BigQuery).
+
+CDN for fast frontend delivery.
+
+🔮 User Flow
+
+Start Meeting in Platform → video + live transcript.
+
+AI Engine extracts tasks/blockers → Kanban auto-updates.
+
+Sprint board is auto-generated → tasks assigned to devs.
+
+During sprint → burndown chart & velocity updated in real time.
+
+Post-sprint → platform auto-generates retro summary + next sprint suggestions.
+
+📈 Development Roadmap
+✅ Phase 1 (MVP – 6-8 weeks)
+
+Video meetings (WebRTC + transcription).
+
+NLP → extract tasks & show on dashboard.
+
+Basic Kanban board (manual + auto task creation).
+
+✅ Phase 2 (2-3 months)
+
+Sprint planning automation.
+
+Real-time Kanban updates across users.
+
+Analytics (burndown, velocity).
+
+Notifications (email/slack).
+
+✅ Phase 3 (4-6 months)
+
+Smart workload balancing.
+
+Predictive analytics (sprint delay forecast).
+
+Engagement tracking (meeting participation heatmap).
+
+Chat + file sharing.
+
+✅ Phase 4 (Enterprise-ready)
+
+Multi-project support.
+
+Role-based permissions.
+
+Cloud deployment (scalable SFU + AI microservices).
+
+Mobile app (React Native).
