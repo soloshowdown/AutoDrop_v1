@@ -1,0 +1,9 @@
+Python 3.8+
+
+FFmpeg
+ (add bin folder to PATH)
+
+Install dependencies:
+
+pip install openai-whisper sounddevice scipy
+
