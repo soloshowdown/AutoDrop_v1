@@ -41,5 +41,5 @@ def record_and_transcribe(duration=7, samplerate=16000):
 
 # Run the script
 if __name__ == "__main__":
-    output = record_and_transcribe(duration=7)  # record for 7 seconds
+    output = record_and_transcribe(duration=30)  # record for 7 seconds
     print("📝 Transcribed text:", output)
