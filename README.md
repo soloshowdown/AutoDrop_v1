@@ -2,7 +2,7 @@
 _Automatically turn meeting discussions into actionable tasks on a Kanban board._
 
 ## 📌 Project Overview
-Meet2Kanban is a major project aimed at simplifying task management from meetings.  
+AutoDrop is a major project aimed at simplifying task management from meetings.  
 The platform will:
 - Capture **live or recorded meeting audio/video**.
 - Generate a **transcript** using speech-to-text (Whisper).
