@@ -1,0 +1,2 @@
+export const APP_ID = 1581479821;
+export const SERVER_SECRET = "7cfe01354b3a678078a906925ce8221e";
