@@ -5,55 +5,65 @@ import Link from "next/link"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Check, Mic, Layout, Zap, Calendar, ArrowRight, Play } from "lucide-react"
+import Lightning from "@/components/ui/Lightning"
 
 export default function LandingPage() {
   return (
     <div className="flex flex-col gap-16 pb-16">
-      {/* Hero Section */}
-      <section className="container mx-auto px-4 pt-24 md:pt-32 flex flex-col items-center text-center gap-6">
-        <div className="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold text-primary bg-primary/10">
-          <Zap className="mr-1 h-3 w-3" /> AutoDrop 2.0 is live
+      {/* Hero Section with Lightning Background */}
+      <section className="relative overflow-hidden">
+        {/* Lightning Background */}
+        <div className="absolute inset-0 z-0">
+          <Lightning hue={220} xOffset={0} speed={1.2} intensity={1.3} size={1} />
         </div>
-        <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight max-w-4xl">
-          Turn Meetings into <span className="text-primary">Actionable Tasks</span> Automatically
-        </h1>
-        <p className="text-xl text-muted-foreground max-w-2xl">
-          Upload your meeting recordings. Our AI extracts action items, assigns owners, and drops them perfectly into your Kanban board.
-        </p>
-        <div className="flex sm:flex-row flex-col gap-4 mt-4">
-          <Link 
-            href="/dashboard" 
-            className={buttonVariants({ size: "lg", className: "gap-2" })}
-          >
-            Get Started <ArrowRight className="h-4 w-4" />
-          </Link>
-          <Button size="lg" variant="outline" className="gap-2">
-            <Play className="h-4 w-4" /> Watch Demo
-          </Button>
-        </div>
-        <div className="mt-12 rounded-xl border bg-muted/20 p-2 md:p-4 max-w-5xl w-full shadow-2xl relative">
-          <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent pointer-events-none z-10 bottom-0 top-1/2" />
-          <div className="aspect-video bg-muted rounded-lg overflow-hidden border shadow-sm relative flex items-center justify-center">
-            {/* Mock Dashboard Screenshot */}
-            <div className="absolute inset-0 flex flex-col">
-              <div className="h-10 border-b flex items-center px-4 gap-2 bg-background/50">
-                <div className="flex gap-1.5"><div className="w-3 h-3 rounded-full bg-red-400"></div><div className="w-3 h-3 rounded-full bg-amber-400"></div><div className="w-3 h-3 rounded-full bg-green-400"></div></div>
-              </div>
-              <div className="flex-1 p-8 grid grid-cols-3 gap-6 bg-muted/30">
-                <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3">
-                  <div className="h-4 w-20 bg-muted-foreground/20 rounded"></div>
-                  <div className="h-20 bg-muted-foreground/10 rounded"></div>
-                  <div className="h-20 bg-muted-foreground/10 rounded"></div>
+        {/* Gradient fade at bottom so the lightning blends into the page */}
+        <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-background to-transparent z-[1]" />
+
+        <div className="container relative z-[2] mx-auto px-4 pt-24 md:pt-32 pb-8 flex flex-col items-center text-center gap-6">
+          <div className="inline-flex items-center rounded-full border border-primary/30 px-2.5 py-0.5 text-xs font-semibold text-primary bg-primary/10 backdrop-blur-sm">
+            <Zap className="mr-1 h-3 w-3" /> AutoDrop 2.0 is live
+          </div>
+          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight max-w-4xl drop-shadow-lg">
+            Turn Meetings into <span className="text-primary">Actionable Tasks</span> Automatically
+          </h1>
+          <p className="text-xl text-muted-foreground max-w-2xl drop-shadow-md">
+            Upload your meeting recordings. Our AI extracts action items, assigns owners, and drops them perfectly into your Kanban board.
+          </p>
+          <div className="flex sm:flex-row flex-col gap-4 mt-4">
+            <Link 
+              href="/dashboard" 
+              className={buttonVariants({ size: "lg", className: "gap-2" })}
+            >
+              Get Started <ArrowRight className="h-4 w-4" />
+            </Link>
+            <Button size="lg" variant="outline" className="gap-2 backdrop-blur-sm">
+              <Play className="h-4 w-4" /> Watch Demo
+            </Button>
+          </div>
+          <div className="mt-12 rounded-xl border bg-muted/20 backdrop-blur-sm p-2 md:p-4 max-w-5xl w-full shadow-2xl relative">
+            <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent pointer-events-none z-10 bottom-0 top-1/2" />
+            <div className="aspect-video bg-muted rounded-lg overflow-hidden border shadow-sm relative flex items-center justify-center">
+              {/* Mock Dashboard Screenshot */}
+              <div className="absolute inset-0 flex flex-col">
+                <div className="h-10 border-b flex items-center px-4 gap-2 bg-background/50">
+                  <div className="flex gap-1.5"><div className="w-3 h-3 rounded-full bg-red-400"></div><div className="w-3 h-3 rounded-full bg-amber-400"></div><div className="w-3 h-3 rounded-full bg-green-400"></div></div>
                 </div>
-                <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3">
-                  <div className="h-4 w-24 bg-muted-foreground/20 rounded"></div>
-                  <div className="h-20 bg-primary/10 border border-primary/20 rounded relative">
-                     <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-primary animate-pulse"></div>
+                <div className="flex-1 p-8 grid grid-cols-3 gap-6 bg-muted/30">
+                  <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3">
+                    <div className="h-4 w-20 bg-muted-foreground/20 rounded"></div>
+                    <div className="h-20 bg-muted-foreground/10 rounded"></div>
+                    <div className="h-20 bg-muted-foreground/10 rounded"></div>
                   </div>
-                </div>
-                <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3 opacity-50">
-                  <div className="h-4 w-16 bg-muted-foreground/20 rounded"></div>
-                  <div className="h-20 bg-muted-foreground/10 rounded"></div>
+                  <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3">
+                    <div className="h-4 w-24 bg-muted-foreground/20 rounded"></div>
+                    <div className="h-20 bg-primary/10 border border-primary/20 rounded relative">
+                       <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-primary animate-pulse"></div>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3 opacity-50">
+                    <div className="h-4 w-16 bg-muted-foreground/20 rounded"></div>
+                    <div className="h-20 bg-muted-foreground/10 rounded"></div>
+                  </div>
                 </div>
               </div>
             </div>
