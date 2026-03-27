@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { NextResponse } from "next/server";
 
 const MIGRATION_SQL = `
@@ -141,7 +141,6 @@ export async function POST() {
     });
 
     // Fallback: try to verify by doing a simple select
-    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Test if tasks table exists with a simple query
     const { error: testError } = await supabase

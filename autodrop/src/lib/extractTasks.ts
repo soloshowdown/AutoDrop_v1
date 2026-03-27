@@ -26,16 +26,16 @@ Return ONLY valid JSON with this exact shape:
   "participants": ["Full Name 1", "Full Name 2"],
   "tasks": [
     {
-      "task": "Prepare Q4 financial report",
-      "who": "John Smith",
-      "to_whom": "Sarah Johnson",
-      "due_date": "Friday EOD",
+      "title": "Prepare Q4 financial report",
+      "assignee": "John Smith",
+      "deadline": "Friday EOD",
       "priority": "high"
     }
   ]
 }
 
 Important:
+- Use exact keys: "title", "assignee", "deadline"
 - Extract FULL NAMES of all people mentioned (not "Speaker 1")
 - If names aren't stated, use contextual clues from title or role
 - Be aggressive about extracting ALL implied tasks
@@ -43,7 +43,7 @@ Important:
 - Preserve exact date references the speaker used
 
 Transcript:
-\${transcript}
+${transcript}
 `;
 
   const completion = await client.chat.completions.create({

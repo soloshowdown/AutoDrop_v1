@@ -5,10 +5,11 @@ import { KanbanBoard } from "@/components/kanban/KanbanBoard"
 import { Button } from "@/components/ui/button"
 import { Plus, Filter, Download, Users } from "lucide-react"
 import { Task, TaskPriority } from "@/lib/types"
-import { createTask, fetchTasks, hasTaskBackendConfigured, updateTaskStatus, deleteTask, updateTask } from "@/lib/services/taskService"
+import { createTask, fetchTasks, hasTaskBackendConfigured, updateTaskStatus, deleteTask, updateTask, subscribeToTasks } from "@/lib/services/taskService"
 import { exportTasksAsCSVFile, exportTasksAsJSONFile } from "@/lib/services/exportService"
-import { fetchTeamMembers, TeamMember } from "@/lib/services/teamService"
+import { fetchWorkspaceMembers } from "@/lib/services/workspaceService"
 import { toast } from "sonner"
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import {
   Dialog,
   DialogContent,
@@ -28,20 +29,25 @@ import {
 } from "@/components/ui/select"
 
 export default function KanbanBoardPage() {
+  const { currentWorkspace, isLoading: isWorkspaceLoading } = useWorkspace()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [teamMembers, setTeamMembers] = useState<any[]>([])
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [editTitle, setEditTitle] = useState("")
   const [editStatus, setEditStatus] = useState<Task["status"]>("To Do")
   const [editPriority, setEditPriority] = useState<TaskPriority>("medium")
   const [editDueDate, setEditDueDate] = useState("")
   const [editAssigneeId, setEditAssigneeId] = useState("")
+  const [editSourceType, setEditSourceType] = useState<"AI" | "User">("User")
+  const [editMeetingTitle, setEditMeetingTitle] = useState("")
+  const [editTranscriptTimestamp, setEditTranscriptTimestamp] = useState("")
 
   const loadTasks = async () => {
+    if (!currentWorkspace?.id) return
     try {
       setLoading(true)
-      const records = await fetchTasks()
+      const records = await fetchTasks(currentWorkspace.id)
       setTasks(records)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load tasks")
@@ -51,18 +57,52 @@ export default function KanbanBoardPage() {
   }
 
   const loadTeamMembers = async () => {
+    if (!currentWorkspace?.id) return
     try {
-      const members = await fetchTeamMembers()
-      setTeamMembers(members)
+      const members = await fetchWorkspaceMembers(currentWorkspace.id)
+      // Map members to the format expected by the UI (joining with users)
+      setTeamMembers(members.map((m: any) => ({
+        id: m.users.id,
+        name: m.users.name,
+        avatar: m.users.avatar_url
+      })))
     } catch (error) {
       console.error("Failed to load team members:", error)
     }
   }
 
   useEffect(() => {
+    if (!currentWorkspace?.id) return
+
     void loadTasks()
     void loadTeamMembers()
-  }, [])
+
+    // Subscribe to real-time changes
+    const subscription = subscribeToTasks(currentWorkspace.id, (payload) => {
+      if (payload.eventType === "INSERT") {
+        const newTask = payload.new as Task
+        setTasks((prev) => {
+          if (prev.find((t) => t.id === newTask.id)) return prev
+          return [...prev, newTask]
+        })
+        toast.info("New task added")
+      } else if (payload.eventType === "UPDATE") {
+        const updatedTask = payload.new as Task
+        setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)))
+      } else if (payload.eventType === "DELETE") {
+        const deletedId = payload.old.id
+        setTasks((prev) => prev.filter((t) => t.id !== deletedId))
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
+  }, [currentWorkspace?.id])
+
+  if (isWorkspaceLoading) {
+    return <div className="p-8">Loading workspace...</div>
+  }
 
   const handleEditTask = (task: Task) => {
     setEditingTask(task)
@@ -71,6 +111,9 @@ export default function KanbanBoardPage() {
     setEditPriority(task.priority || "medium")
     setEditDueDate(task.dueDate ? task.dueDate.split("T")[0] : "")
     setEditAssigneeId(task.assigneeId || "")
+    setEditSourceType(task.sourceType || "User")
+    setEditMeetingTitle(task.meetingTitle || "")
+    setEditTranscriptTimestamp(task.transcriptTimestamp || "")
   }
 
   const handleSaveEdit = async () => {
@@ -86,6 +129,9 @@ export default function KanbanBoardPage() {
         dueDate: editDueDate || undefined,
         priority: editPriority,
         assigneeId: editAssigneeId || undefined,
+        sourceType: editSourceType,
+        meetingTitle: editMeetingTitle || undefined,
+        transcriptTimestamp: editTranscriptTimestamp || undefined,
       })
       setEditingTask(null)
       toast.success("Task updated successfully")
@@ -170,8 +216,8 @@ export default function KanbanBoardPage() {
               await loadTasks()
             }}
             onAddTask={async (title, status) => {
-              if (!title.trim()) return
-              await createTask({ title, status })
+              if (!title.trim() || !currentWorkspace?.id) return
+              await createTask({ workspaceId: currentWorkspace.id, title, status })
               await loadTasks()
             }}
             onEditTask={handleEditTask}
@@ -246,6 +292,38 @@ export default function KanbanBoardPage() {
                 type="date"
                 value={editDueDate}
                 onChange={(e) => setEditDueDate(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="task-source">Source Type</Label>
+                <Select value={editSourceType} onValueChange={(v) => setEditSourceType(v as "AI" | "User")}>
+                  <SelectTrigger id="task-source">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AI">AI Generated</SelectItem>
+                    <SelectItem value="User">User Added</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="task-timestamp">Timestamp</Label>
+                <Input
+                  id="task-timestamp"
+                  placeholder="e.g. 12:45"
+                  value={editTranscriptTimestamp}
+                  onChange={(e) => setEditTranscriptTimestamp(e.target.value)}
+                />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="task-meeting">Source Meeting</Label>
+              <Input
+                id="task-meeting"
+                placeholder="Meeting title"
+                value={editMeetingTitle}
+                onChange={(e) => setEditMeetingTitle(e.target.value)}
               />
             </div>
           </div>

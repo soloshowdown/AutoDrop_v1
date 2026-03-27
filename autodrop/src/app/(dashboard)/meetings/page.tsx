@@ -9,12 +9,41 @@ import { Badge } from "@/components/ui/badge"
 import { listMeetings, uploadAndProcessMeeting } from "@/lib/services/meetingService"
 import { Meeting } from "@/lib/types"
 import { toast } from "sonner"
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import AIProcessingOverlay from "@/components/ai-processing/AIProcessingOverlay"
+import { useEffect } from "react"
 
 export default function MeetingsPage() {
+  const { currentWorkspace, isLoading: isWorkspaceLoading } = useWorkspace()
   const [dragActive, setDragActive] = useState(false)
   const [file, setFile] = useState<File | null>(null)
   const [isUploading, setIsUploading] = useState(false)
-  const [meetings, setMeetings] = useState<Meeting[]>(() => listMeetings())
+  const [meetings, setMeetings] = useState<Meeting[]>([])
+  const [isDataLoading, setIsDataLoading] = useState(true)
+  
+  // AI Processing Overlay States
+  const [showAIOverlay, setShowAIOverlay] = useState(false)
+  const [processingResult, setProcessingResult] = useState<Meeting | null>(null)
+
+  useEffect(() => {
+    if (!currentWorkspace?.id) return
+    async function loadMeetings() {
+      setIsDataLoading(true)
+      try {
+        const data = await listMeetings(currentWorkspace!.id)
+        setMeetings(data)
+      } catch (error) {
+        console.error("Error loading meetings:", error)
+      } finally {
+        setIsDataLoading(false)
+      }
+    }
+    loadMeetings()
+  }, [currentWorkspace?.id])
+
+  if (isWorkspaceLoading) {
+    return <div className="flex items-center justify-center min-h-[400px]">Loading workspace...</div>
+  }
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -46,19 +75,38 @@ export default function MeetingsPage() {
     if (!file) return
     try {
       setIsUploading(true)
-      await uploadAndProcessMeeting(file)
-      setMeetings(listMeetings())
+      // Show overlay as soon as upload/process starts
+      setShowAIOverlay(true)
+      
+      const result = await uploadAndProcessMeeting(file, currentWorkspace!.id)
+      setProcessingResult(result)
+      
+      const updated = await listMeetings(currentWorkspace!.id)
+      setMeetings(updated)
       setFile(null)
-      toast.success("Meeting processed and tasks extracted")
+      // We don't toast success here anymore, the overlay handles the "completion" feel
     } catch (error) {
+      setShowAIOverlay(false) // Hide overlay on error
       toast.error(error instanceof Error ? error.message : "Upload failed")
     } finally {
       setIsUploading(false)
     }
   }
 
+  const handleProcessingComplete = () => {
+    setShowAIOverlay(false)
+    setProcessingResult(null)
+    toast.success("Meeting processed and tasks extracted")
+  }
+
   return (
     <div className="flex flex-col gap-8">
+      <AIProcessingOverlay 
+        isOpen={showAIOverlay} 
+        file={file} 
+        result={processingResult} 
+        onComplete={handleProcessingComplete} 
+      />
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Meetings</h1>
@@ -144,7 +192,7 @@ export default function MeetingsPage() {
                           <span>•</span>
                           <span>{meeting.duration}</span>
                           <span>•</span>
-                          <Badge variant={meeting.status === "Completed" ? "default" : "secondary"}>
+                          <Badge variant={meeting.status === "completed" ? "default" : "secondary"}>
                             {meeting.status}
                           </Badge>
                         </div>

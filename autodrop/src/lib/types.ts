@@ -2,7 +2,7 @@ export interface Meeting {
   id: string;
   title: string;
   date: string;
-  status: "Completed" | "Processing" | "Failed";
+  status: "completed" | "processing" | "failed";
   duration: string;
   roomId?: string;
   transcript?: TranscriptSnippet[];
@@ -23,18 +23,22 @@ export interface Task {
   assigneeId?: string;
   requestedBy?: string;
   meetingId?: string;
+  meetingTitle?: string;
+  sourceType?: "AI" | "User";
+  transcriptTimestamp?: string;
 }
 
 export interface TranscriptSnippet {
   time: string;
   speaker: string;
   text: string;
+  isActionable?: boolean;
+  taskId?: string;
 }
 
 export interface ExtractedTask {
-  who: string;
-  to_whom: string;
-  task: string;
-  due_date: string | null;
+  assignee: string;
+  title: string;
+  deadline: string | null;
   priority?: "low" | "medium" | "high";
 }

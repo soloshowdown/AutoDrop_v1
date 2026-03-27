@@ -4,11 +4,12 @@ import React, { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { FileText, Play, ArrowLeft, Bot, Sparkles, Plus, Download } from "lucide-react"
+import { FileText, Play, ArrowLeft, Bot, Sparkles, Plus, Download, ArrowRight } from "lucide-react"
 import Link from "next/link"
 import { toast } from "sonner"
 import { Meeting, TranscriptSnippet, Task } from "@/lib/types"
 import { downloadFile } from "@/lib/services/exportService"
+import { motion, AnimatePresence } from "framer-motion"
 
 interface MeetingDetailClientProps {
   meeting: Meeting
@@ -23,6 +24,18 @@ export default function MeetingDetailClient({
 }: MeetingDetailClientProps) {
   const [extractedTasks, setExtractedTasks] = useState(initialTasks)
   const [isGenerating, setIsGenerating] = useState(false)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+
+  const handleSnippetClick = (snippet: TranscriptSnippet) => {
+    if (snippet.taskId) {
+      setSelectedTaskId(snippet.taskId === selectedTaskId ? null : snippet.taskId)
+    }
+  }
+
+  const handleTaskClick = (taskId: string) => {
+    setSelectedTaskId(taskId === selectedTaskId ? null : taskId)
+    // Optional: add scroll to transcript logic here
+  }
 
   const handleGenerateTasks = () => {
     setIsGenerating(true)
@@ -128,33 +141,68 @@ ${extractedTasks.map((task) => `- [${task.status}] ${task.title}${task.assignee 
             </div>
           </div>
 
-          <Card className="flex-1 flex flex-col overflow-hidden min-h-[400px]">
-            <CardHeader className="py-4 border-b">
+          <Card className="flex-1 flex flex-col overflow-hidden min-h-[500px] border-primary/10 shadow-lg bg-background/50 backdrop-blur-xl">
+            <CardHeader className="py-4 border-b bg-muted/30">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg flex items-center gap-2"><FileText className="h-5 w-5"/> Transcript</CardTitle>
-                <Input placeholder="Search transcript..." className="h-8 w-[200px]" />
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-primary"/> 
+                  Transcript
+                </CardTitle>
+                <div className="flex items-center gap-2">
+                   <Badge variant="outline" className="bg-primary/5 text-primary border-primary/10">AI Augmented</Badge>
+                   <Input placeholder="Search transcript..." className="h-8 w-[200px] bg-background/50" />
+                </div>
               </div>
             </CardHeader>
-            <CardContent className="p-0 overflow-y-auto max-h-[500px]">
+            <CardContent className="p-0 overflow-y-auto max-h-[600px] scroll-smooth">
               {transcript.length > 0 ? (
-                <div className="divide-y relative">
-                  {transcript.map((snippet, i) => (
-                    <div key={i} className="p-4 hover:bg-muted/30 group flex gap-4 transition-colors">
-                      <div className="w-12 text-sm text-muted-foreground font-mono shrink-0">{snippet.time}</div>
-                      <div className="flex-1">
-                        <span className="font-semibold text-sm block mb-1">{snippet.speaker}</span>
-                        <p className="text-sm leading-relaxed">{snippet.text}</p>
-                      </div>
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-start">
-                        <Button variant="ghost" size="icon" className="h-8 w-8"><Plus className="h-4 w-4"/></Button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="divide-y divide-primary/5 relative">
+                  {transcript.map((snippet, i) => {
+                    const isSelected = snippet.taskId && selectedTaskId === snippet.taskId;
+                    return (
+                      <motion.div 
+                        key={i} 
+                        layout
+                        initial={false}
+                        onClick={() => handleSnippetClick(snippet)}
+                        className={`p-4 group flex gap-4 transition-all duration-300 cursor-pointer relative overflow-hidden ${
+                          isSelected ? "bg-primary/10 border-l-4 border-l-primary" : "hover:bg-muted/50"
+                        } ${snippet.isActionable && !isSelected ? "bg-yellow-500/5" : ""}`}
+                      >
+                        <div className="w-12 text-xs text-muted-foreground font-mono shrink-0 pt-1">{snippet.time}</div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-bold text-sm">{snippet.speaker}</span>
+                            {snippet.isActionable && (
+                              <Badge variant="outline" className="text-[9px] h-4 px-1.5 border-yellow-500/30 text-yellow-600 bg-yellow-500/5">
+                                Actionable Item
+                              </Badge>
+                            )}
+                          </div>
+                          <p className={`text-sm leading-relaxed ${isSelected ? "text-foreground font-medium" : "text-muted-foreground group-hover:text-foreground"}`}>
+                            {snippet.text}
+                          </p>
+                        </div>
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-start gap-1">
+                          {snippet.isActionable && !snippet.taskId ? (
+                             <Button variant="secondary" size="sm" className="h-7 px-2 text-[10px] bg-primary text-primary-foreground">
+                               <Plus className="h-3 w-3 mr-1"/> Create Task
+                             </Button>
+                          ) : (
+                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10 hover:text-primary">
+                               <Plus className="h-4 w-4"/>
+                             </Button>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
                 </div>
               ) : (
-                <div className="p-12 text-center text-muted-foreground flex flex-col items-center">
-                  <Bot className="h-8 w-8 mb-4 opacity-50" />
-                  <p>Transcript is processing.</p>
+                <div className="p-24 text-center text-muted-foreground flex flex-col items-center">
+                  <Bot className="h-12 w-12 mb-4 opacity-20 animate-pulse text-primary" />
+                  <p className="font-medium">Transcript is being processed by AI...</p>
+                  <p className="text-xs opacity-60">This usually takes a few minutes.</p>
                 </div>
               )}
             </CardContent>
@@ -173,24 +221,89 @@ ${extractedTasks.map((task) => `- [${task.status}] ${task.title}${task.assignee 
               </div>
               <CardDescription>Tasks identified by our LLM during the meeting.</CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col gap-4">
-              {extractedTasks.map((task) => (
-                 <div key={task.id} className="p-3 rounded-lg border bg-card shadow-sm group">
-                   <div className="flex justify-between items-start mb-2">
-                     <p className="font-medium text-sm leading-tight">{task.title}</p>
-                   </div>
-                   <div className="flex items-center justify-between mt-4">
-                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
-                           {task.status}
-                        </Badge>
-                        {task.assignee && (
-                          <span className="flex items-center"><div className="w-4 h-4 rounded-full bg-muted mr-1.5 flex items-center justify-center text-[8px] border">{task.assignee[0]}</div> {task.assignee}</span>
+            <CardContent className="flex-1 flex flex-col gap-4 overflow-y-auto max-h-[600px] p-4">
+              <AnimatePresence mode="popLayout">
+                {extractedTasks.map((task) => {
+                  const isSelected = selectedTaskId === task.id;
+                  // Mock confidence score
+                  const confidence = 85 + (parseInt(task.id.slice(-1)) || 5) % 15;
+                  
+                  return (
+                    <motion.div 
+                      key={task.id}
+                      layout
+                      initial={{ opacity: 0, x: 20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      onClick={() => handleTaskClick(task.id)}
+                      className={`p-4 rounded-xl border transition-all duration-300 cursor-pointer group relative overflow-hidden ${
+                        isSelected 
+                          ? "ring-2 ring-primary border-transparent bg-primary/5 shadow-md" 
+                          : "bg-card hover:border-primary/30 hover:shadow-sm"
+                      }`}
+                    >
+                      <div className="flex justify-between items-start mb-3">
+                        <p className={`font-semibold text-sm leading-tight transition-colors ${isSelected ? "text-primary" : "text-foreground"}`}>
+                          {task.title}
+                        </p>
+                        <div className="flex items-center gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                           <span className="text-[10px] font-bold">{confidence}%</span>
+                           <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                             <div 
+                               className="h-full bg-primary transition-all duration-500" 
+                               style={{ width: `${confidence}%` }}
+                             />
+                           </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                           <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-primary/10 text-primary border-transparent">
+                              {task.status}
+                           </Badge>
+                           {task.assignee && (
+                             <div className="flex items-center gap-1.5">
+                               <div className="w-4 h-4 rounded-full bg-primary/20 flex items-center justify-center text-[8px] font-bold text-primary border border-primary/10">
+                                 {task.assignee[0]}
+                               </div>
+                               <span className="text-[10px] text-muted-foreground font-medium">{task.assignee}</span>
+                             </div>
+                           )}
+                        </div>
+                        
+                        {isSelected && (
+                          <motion.div 
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-primary text-primary-foreground p-1 rounded-full shadow-lg"
+                          >
+                             <ArrowRight className="h-3 w-3" />
+                          </motion.div>
                         )}
-                     </div>
-                   </div>
-                 </div>
-              ))}
+                      </div>
+                      
+                      {isSelected && (
+                        <motion.div 
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          className="mt-3 pt-3 border-t border-primary/10 flex items-center justify-between text-[10px] text-muted-foreground"
+                        >
+                          <span className="flex items-center gap-1">
+                            <Sparkles className="h-3 w-3 text-primary" />
+                            AI Confidence High
+                          </span>
+                          <button 
+                            className="hover:text-primary transition-colors flex items-center gap-1 font-bold"
+                          >
+                            View Details <ArrowRight className="h-2.5 w-2.5" />
+                          </button>
+                        </motion.div>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
 
               <Button 
                 className="w-full mt-auto mt-4" 

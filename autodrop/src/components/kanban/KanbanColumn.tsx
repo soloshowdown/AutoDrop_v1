@@ -7,6 +7,7 @@ import { TaskCard } from "./TaskCard";
 import { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface KanbanColumnProps {
   column: { id: TaskStatus; title: string };
@@ -48,14 +49,24 @@ export function KanbanColumn({ column, tasks, onAddTask, onEditTask, onDeleteTas
         className="flex-1 p-3 flex flex-col gap-3 overflow-y-auto"
       >
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
-          {tasks.map((task) => (
-            <TaskCard 
-              key={task.id} 
-              task={task}
-              onEdit={onEditTask}
-              onDelete={onDeleteTask}
-            />
-          ))}
+          <AnimatePresence>
+            {tasks.map((task) => (
+              <motion.div
+                key={task.id}
+                layout
+                initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <TaskCard 
+                  task={task}
+                  onEdit={onEditTask}
+                  onDelete={onDeleteTask}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </SortableContext>
       </div>
     </div>

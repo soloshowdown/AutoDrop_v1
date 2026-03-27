@@ -1,69 +1,23 @@
 "use client";
 
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { supabase } from "@/lib/supabase";
 import { Task, TaskStatus } from "@/lib/types";
+import { logActivity } from "./activityService";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-const supabase: SupabaseClient | null =
-  supabaseUrl && supabaseAnonKey
-    ? createClient(supabaseUrl, supabaseAnonKey)
-    : null;
-
-const statusMap: Record<string, TaskStatus> = {
-  todo: "To Do",
-  "in-progress": "In Progress",
-  done: "Done",
-  backlog: "Backlog",
-};
-
-const reverseStatusMap: Record<TaskStatus, string> = {
-  Backlog: "backlog",
-  "To Do": "todo",
-  "In Progress": "in-progress",
-  Done: "done",
-};
-
-/* ------------------------------------------------------------------ */
-/*  localStorage fallback – used when Supabase tables are unreachable  */
-/* ------------------------------------------------------------------ */
-
-const LOCAL_STORAGE_KEY = "autodrop_tasks";
-
-function getLocalTasks(): Task[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Task[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveLocalTasks(tasks: Task[]) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(tasks));
-}
-
-let useLocalFallback = false;
-
-/* ------------------------------------------------------------------ */
-/*  Supabase helpers                                                   */
-/* ------------------------------------------------------------------ */
-
-function normalizeTask(row: Record<string, unknown>): Task {
-  const assignee = row.assignee as Record<string, unknown> | null;
+function normalizeTask(row: any): Task {
+  if (!row) return {} as Task;
   return {
     id: String(row.id),
     title: String(row.title ?? "Untitled Task"),
-    status: statusMap[String(row.status ?? "todo")] ?? "To Do",
-    priority: (row.priority as "low" | "medium" | "high") ?? "medium",
+    status: (row.status as TaskStatus) ?? "To Do",
+    priority: (row.priority as any) ?? "medium",
     dueDate: row.due_date ? String(row.due_date) : undefined,
     assigneeId: row.assignee_id ? String(row.assignee_id) : undefined,
-    assignee: assignee?.name ? String(assignee.name) : undefined,
-    requestedBy: row.requested_by ? String(row.requested_by) : undefined,
+    assignee: typeof row.assignee === 'object' ? row.assignee?.name : undefined,
+    sourceType: (row.source_type as any) ?? "User",
     meetingId: row.meeting_id ? String(row.meeting_id) : undefined,
+    meetingTitle: row.meeting_title ? String(row.meeting_title) : undefined,
+    transcriptTimestamp: row.transcript_timestamp ? String(row.transcript_timestamp) : undefined,
   };
 }
 
@@ -71,101 +25,79 @@ function normalizeTask(row: Record<string, unknown>): Task {
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
 
-export async function fetchTasks(): Promise<Task[]> {
-  if (useLocalFallback || !supabase) {
-    useLocalFallback = true;
-    return getLocalTasks();
+export async function fetchTasks(workspaceId: string): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*, assignee:users!assignee_id(*)")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching tasks:", error.message);
+    throw error;
   }
 
-  try {
-    const { data, error } = await supabase
-      .from("tasks")
-      .select("*, assignee:team_members!assignee_id(*)")
-      .order("created_at", { ascending: false });
-
-    if (error) {
-      const msg = error.message || "";
-      // If team_members table is missing, retry without the join
-      if (
-        msg.includes("Could not find the table 'public.team_members'") ||
-        msg.includes('table "team_members" does not exist')
-      ) {
-        console.warn("`team_members` table missing – retrying without join.");
-        const { data: fb, error: fbErr } = await supabase
-          .from("tasks")
-          .select("*")
-          .order("created_at", { ascending: false });
-
-        if (fbErr) throw fbErr;
-        return (fb ?? []).map((r) => normalizeTask(r as Record<string, unknown>));
-      }
-      throw error;
-    }
-
-    return (data ?? []).map((r) => normalizeTask(r as Record<string, unknown>));
-  } catch (err) {
-    console.warn("Supabase unreachable – falling back to localStorage.", err);
-    useLocalFallback = true;
-    return getLocalTasks();
-  }
+  return (data ?? []).map((r) => normalizeTask(r));
 }
 
 export async function updateTaskStatus(
   taskId: string,
   status: TaskStatus
 ): Promise<void> {
-  if (useLocalFallback || !supabase) {
-    const tasks = getLocalTasks().map((t) =>
-      t.id === taskId ? { ...t, status } : t
-    );
-    saveLocalTasks(tasks);
-    return;
-  }
-
-  const { error } = await supabase
+  const { data: task, error } = await supabase
     .from("tasks")
-    .update({ status: reverseStatusMap[status], updated_at: new Date().toISOString() })
-    .eq("id", taskId);
+    .update({ status })
+    .eq("id", taskId)
+    .select("title, workspace_id")
+    .single();
 
   if (error) throw new Error(error.message);
+
+  // Log activity on status change
+  if (status === "Done" && task) {
+    await logActivity({
+      workspaceId: task.workspace_id,
+      action: "completed task",
+      target: task.title,
+    });
+  }
 }
 
 export async function createTask(input: {
+  workspaceId: string;
   title: string;
   status?: TaskStatus;
   priority?: "low" | "medium" | "high";
   dueDate?: string;
   assigneeId?: string;
-  requestedBy?: string;
   meetingId?: string;
+  meetingTitle?: string;
+  sourceType?: "AI" | "User";
+  transcriptTimestamp?: string;
 }): Promise<void> {
-  if (useLocalFallback || !supabase) {
-    const tasks = getLocalTasks();
-    const newTask: Task = {
-      id: crypto.randomUUID(),
-      title: input.title,
-      status: input.status ?? "To Do",
-      priority: input.priority ?? "medium",
-      dueDate: input.dueDate,
-      assigneeId: input.assigneeId,
-      requestedBy: input.requestedBy,
-      meetingId: input.meetingId,
-    };
-    saveLocalTasks([newTask, ...tasks]);
-    return;
-  }
-
-  const { error } = await supabase.from("tasks").insert({
+  const { data: task, error } = await supabase.from("tasks").insert({
+    workspace_id: input.workspaceId,
     title: input.title,
-    status: reverseStatusMap[input.status ?? "To Do"],
+    status: input.status ?? "To Do",
     priority: input.priority ?? "medium",
     due_date: input.dueDate ?? null,
     assignee_id: input.assigneeId ?? null,
-    requested_by: input.requestedBy ?? null,
     meeting_id: input.meetingId ?? null,
-  });
+    meeting_title: input.meetingTitle ?? null,
+    source_type: input.sourceType ?? "User",
+    transcript_timestamp: input.transcriptTimestamp ?? null,
+  }).select().single();
 
   if (error) throw new Error(error.message);
+
+  // Log manual task creation
+  if (input.sourceType !== "AI") {
+    await logActivity({
+      workspaceId: input.workspaceId,
+      action: "created task",
+      target: input.title,
+    });
+  }
 }
 
 export async function updateTask(
@@ -176,34 +108,21 @@ export async function updateTask(
     priority?: "low" | "medium" | "high";
     dueDate?: string;
     assigneeId?: string;
+    meetingTitle?: string;
+    sourceType?: "AI" | "User";
+    transcriptTimestamp?: string;
   }
 ): Promise<void> {
-  if (useLocalFallback || !supabase) {
-    const tasks = getLocalTasks().map((t) => {
-      if (t.id !== taskId) return t;
-      return {
-        ...t,
-        ...(input.title !== undefined && { title: input.title }),
-        ...(input.status !== undefined && { status: input.status }),
-        ...(input.priority !== undefined && { priority: input.priority }),
-        ...(input.dueDate !== undefined && { dueDate: input.dueDate }),
-        ...(input.assigneeId !== undefined && { assigneeId: input.assigneeId }),
-      };
-    });
-    saveLocalTasks(tasks);
-    return;
-  }
-
-  const updateData: Record<string, unknown> = {
-    updated_at: new Date().toISOString(),
-  };
+  const updateData: Record<string, any> = {};
 
   if (input.title) updateData.title = input.title;
-  if (input.status) updateData.status = reverseStatusMap[input.status];
+  if (input.status) updateData.status = input.status;
   if (input.priority) updateData.priority = input.priority;
   if (input.dueDate) updateData.due_date = input.dueDate;
-  if (input.assigneeId !== undefined)
-    updateData.assignee_id = input.assigneeId || null;
+  if (input.assigneeId !== undefined) updateData.assignee_id = input.assigneeId || null;
+  if (input.meetingTitle !== undefined) updateData.meeting_title = input.meetingTitle || null;
+  if (input.sourceType !== undefined) updateData.source_type = input.sourceType;
+  if (input.transcriptTimestamp !== undefined) updateData.transcript_timestamp = input.transcriptTimestamp || null;
 
   const { error } = await supabase
     .from("tasks")
@@ -214,18 +133,35 @@ export async function updateTask(
 }
 
 export async function deleteTask(taskId: string): Promise<void> {
-  if (useLocalFallback || !supabase) {
-    const tasks = getLocalTasks().filter((t) => t.id !== taskId);
-    saveLocalTasks(tasks);
-    return;
-  }
-
   const { error } = await supabase.from("tasks").delete().eq("id", taskId);
-
   if (error) throw new Error(error.message);
 }
 
+export function subscribeToTasks(
+  workspaceId: string,
+  onEvent: (payload: { eventType: string; new: Task; old: Task }) => void
+) {
+  return supabase
+    .channel(`tasks-workspace-${workspaceId}`)
+    .on(
+      "postgres_changes" as any,
+      {
+        event: "*",
+        schema: "public",
+        table: "tasks",
+        filter: `workspace_id=eq.${workspaceId}`,
+      },
+      (payload: any) => {
+        onEvent({
+          eventType: payload.eventType,
+          new: normalizeTask(payload.new),
+          old: normalizeTask(payload.old),
+        });
+      }
+    )
+    .subscribe();
+}
+
 export function hasTaskBackendConfigured() {
-  // Always return true so the board renders – localStorage provides fallback
   return true;
 }
