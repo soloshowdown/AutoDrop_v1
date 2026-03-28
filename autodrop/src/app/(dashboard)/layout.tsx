@@ -4,6 +4,7 @@ import { redirect } from "next/navigation"
 import { ClientProviders } from "@/components/providers/ClientProviders"
 import Sidebar from "@/components/Sidebar"
 import TopNavbar from "@/components/TopNavbar"
+import { LiveMeetingInvite } from "@/components/meetings/LiveMeetingInvite"
 
 export default async function DashboardLayout({
   children,
@@ -27,6 +28,7 @@ export default async function DashboardLayout({
           </main>
         </div>
       </div>
+      <LiveMeetingInvite />
     </ClientProviders>
   )
 }

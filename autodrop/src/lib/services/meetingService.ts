@@ -267,3 +267,19 @@ export async function uploadAndProcessMeeting(file: File, workspaceId: string): 
     throw error;
   }
 }
+
+export function subscribeToMeetings(workspaceId: string, onEvent: (payload: any) => void) {
+  return supabase
+    .channel(`public:meetings:workspace:${workspaceId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "meetings",
+        filter: `workspace_id=eq.${workspaceId}`,
+      },
+      onEvent
+    )
+    .subscribe();
+}
