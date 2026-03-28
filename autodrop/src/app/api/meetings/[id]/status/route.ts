@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const meetingId = params.id;
+    const { id: meetingId } = await params;
     const body = await req.json();
     const status = String(body.status || "").trim();
     const duration = body.duration ? String(body.duration).trim() : undefined;

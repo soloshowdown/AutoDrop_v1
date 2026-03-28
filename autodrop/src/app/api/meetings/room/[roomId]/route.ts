@@ -3,10 +3,10 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 export async function GET(
   req: Request,
-  { params }: { params: { roomId: string } }
+  { params }: { params: Promise<{ roomId: string }> }
 ) {
   try {
-    const roomId = String(params.roomId || "").trim();
+    const { roomId } = await params;
     if (!roomId) {
       return NextResponse.json({ error: "Missing roomId" }, { status: 400 });
     }
