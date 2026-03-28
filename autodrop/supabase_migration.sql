@@ -79,6 +79,17 @@ CREATE TABLE IF NOT EXISTS public.activity_log (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
+-- 8. Invitations table
+CREATE TABLE IF NOT EXISTS public.invitations (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    workspace_id UUID REFERENCES public.workspaces(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    role TEXT CHECK (role IN ('admin', 'member')) DEFAULT 'member',
+    invited_by TEXT REFERENCES public.users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    UNIQUE(workspace_id, email)
+);
+
 -- Disable RLS for now as requested (all writes happen server-side or via permissive policies)
 ALTER TABLE public.users DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workspaces DISABLE ROW LEVEL SECURITY;
@@ -87,3 +98,4 @@ ALTER TABLE public.meetings DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transcripts DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_log DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invitations DISABLE ROW LEVEL SECURITY;

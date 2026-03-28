@@ -3,10 +3,10 @@
 import { supabase } from "@/lib/supabase";
 
 export interface Workspace {
-  // force recompile
   id: string;
   name: string;
   created_by: string;
+  role?: "admin" | "member";
   created_at?: string;
 }
 
@@ -20,7 +20,7 @@ export interface WorkspaceMember {
 export async function fetchUserWorkspaces(userId: string): Promise<Workspace[]> {
   const { data, error } = await supabase
     .from("workspace_members")
-    .select("workspaces (*)")
+    .select("role, workspaces (*)")
     .eq("user_id", userId);
 
   if (error) {
@@ -28,7 +28,10 @@ export async function fetchUserWorkspaces(userId: string): Promise<Workspace[]> 
     return [];
   }
 
-  return (data ?? []).map((row: any) => row.workspaces);
+  return (data ?? []).map((row: any) => ({
+    ...row.workspaces,
+    role: row.role as "admin" | "member"
+  }));
 }
 
 export async function createWorkspace(name: string, userId: string): Promise<Workspace | null> {

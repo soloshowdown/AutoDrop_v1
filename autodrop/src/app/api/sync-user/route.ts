@@ -71,6 +71,39 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Error syncing to database' }, { status: 500 })
     }
 
+    // Process pending invitations for new users
+    if (eventType === 'user.created') {
+      const { data: invitations, error: invError } = await supabase
+        .from('invitations')
+        .select('*')
+        .eq('email', email)
+
+      if (invError) {
+        console.error('Error fetching invitations:', invError)
+      } else if (invitations && invitations.length > 0) {
+        // Add user to each workspace they were invited to
+        for (const invitation of invitations) {
+          const { error: joinError } = await supabase
+            .from('workspace_members')
+            .insert({
+              workspace_id: invitation.workspace_id,
+              user_id: id,
+              role: invitation.role,
+            })
+
+          if (joinError) {
+            console.error(`Error adding user ${id} to workspace ${invitation.workspace_id}:`, joinError)
+          } else {
+            // Delete the processed invitation
+            await supabase
+              .from('invitations')
+              .delete()
+              .eq('id', invitation.id)
+          }
+        }
+      }
+    }
+
     return NextResponse.json({ message: 'User synced successfully' }, { status: 200 })
   }
 

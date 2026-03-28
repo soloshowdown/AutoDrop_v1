@@ -19,13 +19,7 @@ export function TeamList() {
     
     fetchWorkspaceMembers(currentWorkspace.id)
       .then((data) => {
-        setMembers(data.map((m: any) => ({
-          id: m.users.id,
-          name: m.users.name,
-          email: m.users.email,
-          avatar: m.users.avatar_url,
-          role: m.role
-        })));
+        setMembers(data);
       })
       .catch((err) => console.error("Failed to fetch members:", err));
   }, [currentWorkspace?.id]);
@@ -71,9 +65,16 @@ export function TeamList() {
               <span className="text-xs font-semibold truncate group-hover:text-primary transition-colors">
                 {member.name}
               </span>
-              <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">
-                {member.role || "Member"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">
+                  {member.role || "Member"}
+                </span>
+                {member.status === 'pending' && (
+                  <span className="text-[8px] bg-amber-500/10 text-amber-500 px-1 rounded font-bold uppercase tracking-tighter">
+                    Pending
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}

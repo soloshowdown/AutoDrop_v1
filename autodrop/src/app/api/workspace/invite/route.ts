@@ -35,27 +35,42 @@ export async function POST(req: Request) {
       .eq('email', email)
       .single()
 
-    if (userError || !targetUser) {
-      return NextResponse.json({ error: 'User not found in AutoDrop. They must sign in first.' }, { status: 404 })
-    }
+    if (targetUser) {
+      // 3a. Add existing user to workspace_members
+      const { error: inviteError } = await supabase
+        .from('workspace_members')
+        .insert({
+          workspace_id: workspaceId,
+          user_id: targetUser.id,
+          role: role,
+        })
 
-    // 3. Add user to workspace_members
-    const { error: inviteError } = await supabase
-      .from('workspace_members')
-      .insert({
-        workspace_id: workspaceId,
-        user_id: targetUser.id,
-        role: role,
-      })
-
-    if (inviteError) {
-      if (inviteError.code === '23505') {
-        return NextResponse.json({ error: 'User is already a member of this workspace' }, { status: 400 })
+      if (inviteError) {
+        if (inviteError.code === '23505') {
+          return NextResponse.json({ error: 'User is already a member of this workspace' }, { status: 400 })
+        }
+        throw inviteError
       }
-      throw inviteError
-    }
+      return NextResponse.json({ message: 'User added to workspace successfully' }, { status: 200 })
+    } else {
+      // 3b. User doesn't exist yet, create a pending invitation
+      const { error: inviteError } = await supabase
+        .from('invitations')
+        .insert({
+          workspace_id: workspaceId,
+          email: email,
+          role: role,
+          invited_by: requesterId,
+        })
 
-    return NextResponse.json({ message: 'User invited successfully' }, { status: 200 })
+      if (inviteError) {
+        if (inviteError.code === '23505') {
+          return NextResponse.json({ error: 'An invitation is already pending for this email in this workspace' }, { status: 400 })
+        }
+        throw inviteError
+      }
+      return NextResponse.json({ message: 'Invitation sent' }, { status: 200 })
+    }
   } catch (error: any) {
     console.error('Invite error:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })

@@ -45,7 +45,35 @@ export async function GET(
 
     if (membersError) throw membersError
 
-    return NextResponse.json(members, { status: 200 })
+    // 3. Fetch pending invitations
+    const { data: invitations, error: invError } = await supabase
+      .from('invitations')
+      .select('id, email, role')
+      .eq('workspace_id', workspaceId)
+
+    if (invError) console.error('Error fetching invitations:', invError)
+
+    // Format the response to include both members and invites
+    const combined = [
+      ...(members || []).map((m: any) => ({
+        id: m.user.id,
+        name: m.user.name,
+        email: m.user.email,
+        avatar: m.user.avatar_url,
+        role: m.role,
+        status: 'active'
+      })),
+      ...(invitations || []).map((i: any) => ({
+        id: i.id, // Using invitation ID as fallback
+        name: i.email.split('@')[0], // Placeholder name
+        email: i.email,
+        avatar: null,
+        role: i.role,
+        status: 'pending'
+      }))
+    ]
+
+    return NextResponse.json(combined, { status: 200 })
   } catch (error: any) {
     console.error('Error fetching members:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
