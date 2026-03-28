@@ -20,6 +20,7 @@ import {
   SelectValue 
 } from "@/components/ui/select";
 import { Mail, Copy, Check, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
 
@@ -126,8 +127,9 @@ export function InviteModal({ isOpen, onOpenChange }: InviteModalProps) {
           </div>
 
           <div className="grid gap-2">
-            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80">
+            <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground/80 flex items-center justify-between">
               Share Invite Link
+              <Badge variant="outline" className="text-[9px] bg-primary/5 text-primary border-primary/20">Recommended</Badge>
             </Label>
             <div className="flex gap-2">
               <Input
@@ -144,6 +146,9 @@ export function InviteModal({ isOpen, onOpenChange }: InviteModalProps) {
                 {copied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
               </Button>
             </div>
+            <p className="text-[10px] text-muted-foreground mt-1 px-1 italic">
+              * Since you're using Gmail, copy this link and send it manually via Slack or Email.
+            </p>
           </div>
         </div>
 

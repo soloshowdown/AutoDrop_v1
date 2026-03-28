@@ -140,6 +140,16 @@ export default function InvitesPage() {
              <p className="text-muted-foreground max-w-[280px]">When someone invites you to their workspace, it will appear here.</p>
           </div>
         )}
+
+        <div className="mt-12 pt-8 border-t border-muted/30 flex flex-col items-center gap-2">
+           <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">Debug Presence</p>
+           <p className="text-[10px] text-muted-foreground/60 font-mono bg-muted/20 px-3 py-1.5 rounded-full border border-muted/40">
+             Checking for invitations sent to: <span className="text-primary font-bold">{user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress}</span>
+           </p>
+           <p className="text-[9px] text-muted-foreground/40 text-center max-w-sm">
+             Note: Invitations are case-insensitive. If you don't see an invite, ensure the sender used this exact email address.
+           </p>
+        </div>
       </div>
     </div>
   );
