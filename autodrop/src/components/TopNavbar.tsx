@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { usePathname } from "next/navigation"
 import { LayoutDashboard, Video, KanbanSquare, Settings, Play, Phone } from "lucide-react"
-import { Show, UserButton, SignInButton } from '@clerk/nextjs'
+import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/nextjs'
 
 const sidebarItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -76,16 +76,16 @@ export default function TopNavbar() {
         </form>
       </div>
       <div className="flex items-center gap-2">
-        <Show when="signed-in">
+        <SignedIn>
           <UserButton />
-        </Show>
-        <Show when="signed-out">
+        </SignedIn>
+        <SignedOut>
           <SignInButton>
             <button className={buttonVariants({ variant: "secondary", size: "sm" })}>
               Sign in
             </button>
           </SignInButton>
-        </Show>
+        </SignedOut>
       </div>
     </header>
   )

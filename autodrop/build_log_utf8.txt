@@ -1,0 +1,72 @@
+﻿   Γû▓ Next.js 15.4.11
+   - Environments: .env.local
+
+   Creating an optimized production build ...
+node.exe :  ΓÜá Compiled with warnings in 3.0s
+At C:\Users\kunal\AppData\Roaming\npm\npx.ps1:24 char:5
++     & "node$exe"  "$basedir/node_modules/npm/bin/npx-cli.js" $args
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ( ΓÜá Compiled with war 
+   nings in 3.0s:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+./src/components/TopNavbar.tsx
+Attempted import error: 'Show' is not exported from '@clerk/nextjs' 
+(imported as 'Show').
+
+Import trace for requested module:
+./src/components/TopNavbar.tsx
+
+./src/components/TopNavbar.tsx
+Attempted import error: 'Show' is not exported from '@clerk/nextjs' 
+(imported as 'Show').
+
+Import trace for requested module:
+./src/components/TopNavbar.tsx
+
+ ΓÜá Compiled with warnings in 2000ms
+
+./src/components/TopNavbar.tsx
+Attempted import error: 'Show' is not exported from '@clerk/nextjs' 
+(imported as 'Show').
+
+Import trace for requested module:
+./src/components/TopNavbar.tsx
+
+./src/components/TopNavbar.tsx
+Attempted import error: 'Show' is not exported from '@clerk/nextjs' 
+(imported as 'Show').
+
+Import trace for requested module:
+./src/components/TopNavbar.tsx
+
+ Γ£ô Compiled successfully in 5.0s
+   Linting and checking validity of types ...
+ Γ¿» ESLint: Cannot find module 'D:\kunals work\AutoDrop_v1\autodrop
+\node_modules\eslint-config-next\core-web-vitals' imported from 
+D:\kunals work\AutoDrop_v1\autodrop\eslint.config.mjs Did you mean 
+to import "eslint-config-next/core-web-vitals.js"?
+Failed to compile.
+
+./src/components/TopNavbar.tsx:20:10
+Type error: Module '"@clerk/nextjs"' has no exported member 'Show'.
+
+[0m [90m 18 |[39m [36mimport[39m { usePathname } 
+[36mfrom[39m [32m"next/navigation"[39m
+ [90m 19 |[39m [36mimport[39m { 
+[33mLayoutDashboard[39m[33m,[39m [33mVideo[39m[33m,[39m 
+[33mKanbanSquare[39m[33m,[39m [33mSettings[39m[33m,[39m 
+[33mPlay[39m[33m,[39m [33mPhone[39m } [36mfrom[39m 
+[32m"lucide-react"[39m
+[31m[1m>[22m[39m[90m 20 |[39m [36mimport[39m { 
+[33mShow[39m[33m,[39m [33mUserButton[39m[33m,[39m 
+[33mSignInButton[39m } [36mfrom[39m [32m'@clerk/nextjs'[39m
+ [90m    |[39m          [31m[1m^[22m[39m
+ [90m 21 |[39m
+ [90m 22 |[39m [36mconst[39m sidebarItems [33m=[39m [
+ [90m 23 |[39m   { title[33m:[39m 
+[32m"Dashboard"[39m[33m,[39m href[33m:[39m 
+[32m"/dashboard"[39m[33m,[39m icon[33m:[39m 
+[33mLayoutDashboard[39m }[33m,[39m[0m
+Next.js build worker exited with code: 1 and signal: null
