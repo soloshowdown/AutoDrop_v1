@@ -28,6 +28,11 @@ export function ActivityFeed() {
   const { currentWorkspace } = useWorkspace();
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!currentWorkspace?.id) return;
@@ -46,7 +51,7 @@ export function ActivityFeed() {
     loadActivities();
   }, [currentWorkspace?.id]);
 
-  if (loading) {
+  if (!isMounted || loading) {
     return <div className="text-[10px] text-muted-foreground p-4 italic uppercase tracking-widest font-bold opacity-50">Syncing live feed...</div>;
   }
 

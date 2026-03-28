@@ -19,6 +19,11 @@ export default function DashboardPage() {
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [isDataLoading, setIsDataLoading] = useState(true)
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
 
   useEffect(() => {
     if (!currentWorkspace?.id) return
@@ -45,7 +50,7 @@ export default function DashboardPage() {
   const completedTasks = useMemo(() => tasks.filter((t) => t.status === "Done").length, [tasks])
   const pendingTasks = tasks.length - completedTasks
 
-  if (isWorkspaceLoading || (isDataLoading && meetings.length === 0)) {
+  if (!isMounted || isWorkspaceLoading || (isDataLoading && meetings.length === 0)) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
@@ -154,7 +159,7 @@ export default function DashboardPage() {
                       <p className="font-bold text-base truncate group-hover:text-primary transition-colors">{meeting.title}</p>
                       <div className="flex items-center gap-3 mt-1 opacity-60">
                          <span className="text-[10px] font-black uppercase tracking-widest">
-                           {meeting.date ? new Date(meeting.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : "Recently"}
+                           {meeting.date ? new Date(meeting.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "Recently"}
                          </span>
                          <span className="text-muted-foreground/30">•</span>
                          <span className="bg-primary/5 text-primary text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest border border-primary/10">AI Optimized</span>
