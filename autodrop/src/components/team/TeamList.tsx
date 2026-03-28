@@ -50,14 +50,14 @@ export function TeamList() {
               <Avatar size="sm">
                 <AvatarImage src={member.avatar} />
                 <AvatarFallback className="text-[10px]">
-                  {member.name.substring(0, 2).toUpperCase()}
+                  {member.name ? member.name.substring(0, 2).toUpperCase() : "???"}
                 </AvatarFallback>
               </Avatar>
               {/* Online status indicator - mock */}
               <div 
                 className={cn(
                   "absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background",
-                  Math.random() > 0.3 ? "bg-green-500" : "bg-gray-400"
+                  "bg-green-500" // Removed Math.random() to prevent hydration mismatch
                 )} 
               />
             </div>
