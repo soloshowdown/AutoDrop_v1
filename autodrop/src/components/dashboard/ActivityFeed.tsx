@@ -71,7 +71,8 @@ export function ActivityFeed() {
       <div className="space-y-6 relative before:absolute before:left-[17px] before:top-2 before:bottom-2 before:w-[2px] before:bg-muted/50">
         {activities.map((activity, index) => {
           // Find matching icon config
-          const actionKey = Object.keys(iconMap).find(k => activity.action.toLowerCase().includes(k)) || "default";
+          const action = activity.action || "";
+          const actionKey = Object.keys(iconMap).find(k => action.toLowerCase().includes(k)) || "default";
           const config = iconMap[actionKey];
           const Icon = config.icon;
           

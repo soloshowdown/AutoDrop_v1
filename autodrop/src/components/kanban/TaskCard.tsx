@@ -77,8 +77,12 @@ export function TaskCard({ task, isOverlay, onEdit, onDelete }: TaskCardProps) {
                </div>
                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 shrink-0 mt-0.5">
                   {!isOverlay && (
-                     <DropdownMenu>
-                       <DropdownMenuTrigger render={<button className="h-6 w-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-4 w-4" /></button>} />
+                      <DropdownMenu>
+                        <DropdownMenuTrigger>
+                          <button className="h-6 w-6 inline-flex items-center justify-center text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors" onClick={(e) => e.stopPropagation()}>
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                        </DropdownMenuTrigger>
                        <DropdownMenuContent align="end" className="rounded-xl border-primary/20">
                          <DropdownMenuItem onClick={() => onEdit?.(task)} className="cursor-pointer">
                            <Edit2 className="h-4 w-4 mr-2" /> Edit

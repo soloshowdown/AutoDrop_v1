@@ -47,25 +47,22 @@ export function WorkspaceSwitcher() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        nativeButton={false}
-        render={
-          <div className="flex h-12 w-full items-center justify-between gap-2 px-3 hover:bg-muted/60 transition-colors cursor-pointer rounded-lg outline-none">
-            <div className="flex items-center gap-3 overflow-hidden">
-              <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white font-bold bg-primary")}>
-                {currentWorkspace.name.substring(0, 1).toUpperCase()}
-              </div>
-              <div className="flex flex-col items-start overflow-hidden text-left leading-tight">
-                <span className="truncate text-sm font-semibold">{currentWorkspace.name}</span>
-                <span className="truncate text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
-                  {currentWorkspace.role || "Admin"}
-                </span>
-              </div>
+      <DropdownMenuTrigger>
+        <div className="flex h-12 w-full items-center justify-between gap-2 px-3 hover:bg-muted/60 transition-colors cursor-pointer rounded-lg outline-none">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white font-bold bg-primary")}>
+              {currentWorkspace.name.substring(0, 1).toUpperCase()}
             </div>
-            <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <div className="flex flex-col items-start overflow-hidden text-left leading-tight">
+              <span className="truncate text-sm font-semibold">{currentWorkspace.name}</span>
+              <span className="truncate text-[10px] text-muted-foreground uppercase tracking-wider font-bold">
+                {currentWorkspace.role || "Admin"}
+              </span>
+            </div>
           </div>
-        }
-      />
+          <ChevronsUpDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </div>
+      </DropdownMenuTrigger>
       <DropdownMenuContent className="w-64" align="start" sideOffset={10}>
         <DropdownMenuLabel className="text-xs font-semibold text-muted-foreground uppercase tracking-wider py-2">
           Workspaces
