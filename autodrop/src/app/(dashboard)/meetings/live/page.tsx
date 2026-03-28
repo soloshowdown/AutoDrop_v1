@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
 import { createLiveMeeting, fetchMeetingByRoomId, setMeetingStatus } from "@/lib/services/meetingService";
 import { Task, TranscriptSnippet } from "@/lib/types";
+import { approveTask, deleteTask, fetchPendingTasks } from "@/lib/services/taskService";
 import { Mic, MicOff, Video, StopCircle, Loader2, Zap, Check } from "lucide-react";
 
 export default function LiveMeetingPage() {
@@ -46,22 +47,36 @@ export default function LiveMeetingPage() {
     if (!joinedRoomId || !currentWorkspace?.id) return;
     
     // 1. Sync meeting
-    const { fetchMeetingByRoomId } = await import("@/lib/services/meetingService");
     const meeting = await fetchMeetingByRoomId(joinedRoomId);
     if (meeting) {
       setLiveMeeting(meeting);
       setLiveMeetingId(meeting.id);
+    } else {
+      // 1b. If the meeting doesn't exist, create it (handles late workspace load)
+      const fullName = userName.trim() || "AutoDrop User";
+      const workspaceInfo = currentWorkspace?.name ? `(${currentWorkspace.name})` : "";
+      const finalUserName = `${fullName} ${workspaceInfo}`.trim();
+      
+      const newMeeting = await createLiveMeeting(
+        currentWorkspace.id, 
+        joinedRoomId, 
+        `${finalUserName}'s meeting`
+      );
+      if (newMeeting?.id) {
+        setLiveMeeting(newMeeting);
+        setLiveMeetingId(newMeeting.id);
+      }
     }
 
     // 2. Fetch pending tasks for this meeting
-    const { fetchPendingTasks } = await import("@/lib/services/taskService");
     const pending = await fetchPendingTasks(currentWorkspace.id);
-    const meetingTasks = meeting 
-      ? pending.filter(t => t.meetingId === meeting.id)
-      : pending;
+    const mId = liveMeetingId || meeting?.id;
+    const meetingTasks = mId 
+      ? pending.filter(t => t.meetingId === mId)
+      : [];
     
     setLiveTasks(meetingTasks);
-  }, [joinedRoomId, currentWorkspace?.id]);
+  }, [joinedRoomId, currentWorkspace?.id, currentWorkspace?.name, userName, liveMeetingId]);
 
   useEffect(() => {
     if (!joinedRoomId) return;
@@ -148,12 +163,15 @@ export default function LiveMeetingPage() {
       });
 
       setJoinedRoomId(finalRoomId);
+      
+      // Attempt immediate sync
       if (currentWorkspace?.id) {
         const meeting = await createLiveMeeting(currentWorkspace.id, finalRoomId, `${finalUserName}'s meeting`);
         if (meeting?.id) {
           setLiveMeetingId(meeting.id);
         }
       }
+
       router.replace(`/meetings/live?room=${encodeURIComponent(finalRoomId)}`);
       toast.success(`Joined room ${finalRoomId}`);
     } catch (error) {
@@ -161,7 +179,7 @@ export default function LiveMeetingPage() {
     } finally {
       setIsJoining(false);
     }
-  }, [roomId, router, userName, currentWorkspace?.id]);
+  }, [roomId, router, userName, currentWorkspace?.id, currentWorkspace?.name]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -327,7 +345,6 @@ export default function LiveMeetingPage() {
   };
 
   const handleApproveLiveTask = async (taskId: string) => {
-    const { approveTask } = await import("@/lib/services/taskService");
     try {
       await approveTask(taskId);
       toast.success("Task sent to Kanban!");
@@ -338,7 +355,6 @@ export default function LiveMeetingPage() {
   };
 
   const handleDeleteLiveTask = async (taskId: string) => {
-    const { deleteTask } = await import("@/lib/services/taskService");
     try {
       await deleteTask(taskId);
       setLiveTasks(prev => prev.filter(t => t.id !== taskId));
