@@ -91,7 +91,9 @@ export default function LiveMeetingPage() {
 
     try {
       setIsJoining(true);
-      const finalUserName = userName.trim() || "AutoDrop User";
+      const fullName = userName.trim() || "AutoDrop User";
+      const workspaceInfo = currentWorkspace?.name ? `(${currentWorkspace.name})` : "";
+      const finalUserName = `${fullName} ${workspaceInfo}`.trim();
       const userId = `user_${Date.now()}`;
 
       const response = await fetch("/api/zegocloud/token", {

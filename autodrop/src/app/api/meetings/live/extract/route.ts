@@ -43,8 +43,8 @@ export async function POST(req: Request) {
       .select("*, users (*)")
       .eq("workspace_id", workspaceId);
 
-    const membersArray = (workspaceMembers || []) as any[];
     const insertedTasks: any[] = [];
+    const membersCache: Record<string, any[]> = { [workspaceId]: (workspaceMembers || []) as any[] };
 
     for (const item of extractedTasks) {
       const title = String(item.title || "").trim();
@@ -54,13 +54,43 @@ export async function POST(req: Request) {
       if (existingTitles.includes(normalizedTitle)) continue;
       existingTitles.push(normalizedTitle);
 
-      const assigneeName = item.assignee?.trim() || speaker;
-      const assigneeId = resolveAssigneeIdFromName(assigneeName, membersArray);
+      let targetWorkspaceId = workspaceId;
+      let assigneeName = item.assignee?.trim() || speaker;
+      
+      // Check for workspace hint in name: "Name (Workspace)"
+      const workspaceMatch = assigneeName.match(/(.+?)\s*\((.+?)\)/);
+      if (workspaceMatch) {
+        const [, actualName, workspaceName] = workspaceMatch;
+        assigneeName = actualName.trim();
+        
+        // Try to find target workspace by name
+        const { data: targetWs } = await supabaseAdmin
+          .from("workspaces")
+          .select("id")
+          .ilike("name", workspaceName.trim())
+          .limit(1)
+          .single();
+          
+        if (targetWs) {
+          targetWorkspaceId = targetWs.id;
+          
+          // Seed cache for the new workspace if not present
+          if (!membersCache[targetWorkspaceId]) {
+            const { data: targetMembers } = await supabaseAdmin
+              .from("workspace_members")
+              .select("*, users (*)")
+              .eq("workspace_id", targetWorkspaceId);
+            membersCache[targetWorkspaceId] = (targetMembers || []) as any[];
+          }
+        }
+      }
+
+      const assigneeId = resolveAssigneeIdFromName(assigneeName, membersCache[targetWorkspaceId]);
 
       const { data: insertedTask, error: insertTaskError } = await supabaseAdmin
         .from("tasks")
         .insert({
-          workspace_id: workspaceId,
+          workspace_id: targetWorkspaceId,
           meeting_id: meetingId,
           title,
           assignee_id: assigneeId || null,

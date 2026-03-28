@@ -175,3 +175,12 @@ export async function removeWorkspaceMember(workspaceId: string, userId: string)
 
   if (error) throw new Error(error.message);
 }
+
+export async function updateWorkspaceName(workspaceId: string, newName: string) {
+  const { error } = await supabase
+    .from("workspaces")
+    .update({ name: newName })
+    .eq("id", workspaceId);
+
+  if (error) throw new Error(error.message);
+}

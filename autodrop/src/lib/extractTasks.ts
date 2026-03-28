@@ -74,14 +74,16 @@ export async function extractTasksFromChunk(speechText: string, speaker: string)
 
 Task:
 - Read the transcript chunk below.
-- Extract only the new tasks and commitments made in this chunk.
-- Assign tasks by speaker when the speaker says "I will..." or by named person when the text says "<name> will...".
+- Extract NEW tasks and commitments. Identify BOTH who is speaking and who is being assigned the task.
+- People may be referred to by name, e.g., "Mags, you should do X" or "I want Kunal to handle Y".
+- Assignee identification: Look for names in the text or use the speaker if they commit with "I will...".
+- Participants might have workspace info in their name, e.g., "Kunal (AutoDrop)". Extract exactly what is mentioned or the closest name.
 - Return only valid JSON with this exact structure:
 {
   "tasks": [
     {
       "title": "Short task description",
-      "assignee": "Full Name or Speaker",
+      "assignee": "Full Name + Workspace if available",
       "deadline": "as stated in text or null",
       "priority": "low" | "medium" | "high"
     }

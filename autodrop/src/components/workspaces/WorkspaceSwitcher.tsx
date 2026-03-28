@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronsUpDown, Plus, LayoutGrid } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, LayoutGrid, Settings, Edit2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
+import { updateWorkspaceName } from "@/lib/services/workspaceService";
+import { toast } from "sonner";
 
 export function WorkspaceSwitcher() {
   const { currentWorkspace, workspaces, switchWorkspace } = useWorkspace();
@@ -40,6 +42,21 @@ export function WorkspaceSwitcher() {
       console.error(error);
     } finally {
       setIsCreating(false);
+    }
+  };
+
+  const handleRenameWorkspace = async () => {
+    if (!currentWorkspace?.id) return;
+    const newName = prompt("Enter new workspace name:", currentWorkspace.name);
+    if (!newName || newName.trim() === "" || newName === currentWorkspace.name) return;
+
+    try {
+      await updateWorkspaceName(currentWorkspace.id, newName.trim());
+      toast.success("Workspace renamed successfully");
+      window.location.reload();
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to rename workspace");
     }
   };
 
@@ -86,6 +103,17 @@ export function WorkspaceSwitcher() {
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
+        
+        {currentWorkspace.role === "admin" && (
+          <DropdownMenuItem 
+            className="py-2.5 px-3 cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+            onClick={handleRenameWorkspace}
+          >
+            <Edit2 className="mr-2 h-4 w-4" />
+            <span className="text-sm font-semibold">Rename Current Workspace</span>
+          </DropdownMenuItem>
+        )}
+
         <DropdownMenuItem 
           className="py-2.5 px-3 cursor-pointer text-primary bg-primary/5 hover:bg-primary/10 transition-colors"
           onClick={handleCreateWorkspace}
