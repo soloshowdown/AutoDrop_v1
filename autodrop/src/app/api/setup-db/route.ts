@@ -146,6 +146,36 @@ DO $$ BEGIN
     task_id uuid REFERENCES tasks(id) ON DELETE SET NULL,
     created_at timestamptz DEFAULT now()
   );
+
+  -- Enable RLS for new tables
+  ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
+  ALTER TABLE transcripts ENABLE ROW LEVEL SECURITY;
+
+  -- Permissive policies for meetings
+  DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'meetings' AND policyname = 'Allow public read access to meetings') THEN
+      CREATE POLICY "Allow public read access to meetings" ON meetings FOR SELECT USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'meetings' AND policyname = 'Allow public insert to meetings') THEN
+      CREATE POLICY "Allow public insert to meetings" ON meetings FOR INSERT WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'meetings' AND policyname = 'Allow public update to meetings') THEN
+      CREATE POLICY "Allow public update to meetings" ON meetings FOR UPDATE USING (true) WITH CHECK (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'meetings' AND policyname = 'Allow public delete from meetings') THEN
+      CREATE POLICY "Allow public delete from meetings" ON meetings FOR DELETE USING (true);
+    END IF;
+  END $$;
+
+  -- Permissive policies for transcripts
+  DO $$ BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'transcripts' AND policyname = 'Allow public read access to transcripts') THEN
+      CREATE POLICY "Allow public read access to transcripts" ON transcripts FOR SELECT USING (true);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'transcripts' AND policyname = 'Allow public insert to transcripts') THEN
+      CREATE POLICY "Allow public insert to transcripts" ON transcripts FOR INSERT WITH CHECK (true);
+    END IF;
+  END $$;
 END $$;
 `;
 
