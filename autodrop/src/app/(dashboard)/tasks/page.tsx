@@ -136,20 +136,51 @@ export default function KanbanBoardPage() {
 
     // Subscribe to real-time changes
     const subscription = subscribeToTasks(currentWorkspace.id, (payload) => {
+      const isMockDataActive = (prev: Task[]) => prev.some(t => t.id.startsWith('mock-'));
+
       if (payload.eventType === "INSERT") {
         const newTask = payload.new as Task
-        setTasks((prev) => {
-          const filtered = prev.filter(t => !t.id.startsWith('mock-'))
-          if (filtered.find((t) => t.id === newTask.id)) return prev
-          return [...filtered, newTask]
-        })
-        toast.info("New task added")
+        if (newTask.approved) {
+          setTasks((prev) => {
+            const filtered = prev.filter(t => !t.id.startsWith('mock-'))
+            if (filtered.find((t) => t.id === newTask.id)) return prev
+            const combined = [...filtered, newTask]
+            prevTasksCount.current = combined.length
+            return combined
+          })
+          toast.info("New task added")
+        }
       } else if (payload.eventType === "UPDATE") {
         const updatedTask = payload.new as Task
-        setTasks((prev) => prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)))
+        setTasks((prev) => {
+          const filtered = prev.filter(t => !t.id.startsWith('mock-'))
+          const exists = filtered.find(t => t.id === updatedTask.id);
+          
+          if (updatedTask.approved) {
+            let result;
+            if (exists) {
+              result = filtered.map(t => t.id === updatedTask.id ? updatedTask : t);
+            } else {
+              result = [...filtered, updatedTask];
+              toast.info("A task has been approved and added to your board.");
+            }
+            prevTasksCount.current = result.length;
+            return result;
+          } else {
+            // Task unapproved or was moved out of view
+            const result = filtered.filter(t => t.id !== updatedTask.id);
+            // If we filtered out the last real task, revert to mock if desired, or stay empty
+            if (result.length === 0) return MOCK_TASKS;
+            return result;
+          }
+        })
       } else if (payload.eventType === "DELETE") {
         const deletedId = payload.old.id
-        setTasks((prev) => prev.filter((t) => t.id !== deletedId))
+        setTasks((prev) => {
+          const result = prev.filter((t) => t.id !== deletedId);
+          if (result.length === 0) return MOCK_TASKS;
+          return result;
+        })
       }
     })
 
