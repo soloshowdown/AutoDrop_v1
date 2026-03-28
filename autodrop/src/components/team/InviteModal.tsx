@@ -35,8 +35,12 @@ export function InviteModal({ isOpen, onOpenChange }: InviteModalProps) {
   const [copied, setCopied] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
+  const inviteLink = typeof window !== "undefined" 
+    ? `${window.location.origin}/signup?invite=${currentWorkspace?.id || ""}`
+    : "";
+
   const handleCopyLink = () => {
-    navigator.clipboard.writeText("https://autodrop.io/invite/ABC-123-XYZ");
+    navigator.clipboard.writeText(inviteLink);
     setCopied(true);
     toast.success("Invite link copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
@@ -128,7 +132,7 @@ export function InviteModal({ isOpen, onOpenChange }: InviteModalProps) {
             <div className="flex gap-2">
               <Input
                 readOnly
-                value="https://autodrop.io/invite/ABC-123-XYZ"
+                value={inviteLink}
                 className="rounded-xl border-primary/10 bg-muted/30 text-[10px] font-mono select-all"
               />
               <Button 
