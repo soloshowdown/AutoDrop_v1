@@ -2,7 +2,7 @@ export interface Meeting {
   id: string;
   title: string;
   date: string;
-  status: "completed" | "processing" | "failed";
+  status: "completed" | "processing" | "failed" | "live";
   duration: string;
   roomId?: string;
   transcript?: TranscriptSnippet[];

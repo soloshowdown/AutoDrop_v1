@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { UploadCloud, File, Video, ArrowRight, Phone } from "lucide-react"
@@ -11,9 +12,9 @@ import { Meeting } from "@/lib/types"
 import { toast } from "sonner"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import AIProcessingOverlay from "@/components/ai-processing/AIProcessingOverlay"
-import { useEffect } from "react"
 
 export default function MeetingsPage() {
+  const router = useRouter()
   const { currentWorkspace, isLoading: isWorkspaceLoading } = useWorkspace()
   const [dragActive, setDragActive] = useState(false)
   const [file, setFile] = useState<File | null>(null)
@@ -39,6 +40,9 @@ export default function MeetingsPage() {
       }
     }
     loadMeetings()
+
+    const interval = setInterval(loadMeetings, 3000)
+    return () => clearInterval(interval)
   }, [currentWorkspace?.id])
 
   if (isWorkspaceLoading) {
@@ -117,6 +121,28 @@ export default function MeetingsPage() {
           Join Live Call
         </Link>
       </div>
+      {meetings.find((meeting) => meeting.status === "live" && meeting.roomId) ? (
+        <Card className="border-emerald-500/20 bg-emerald-500/10 p-4 mt-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.24em] text-emerald-600">Live meeting active</p>
+              <h2 className="text-xl font-semibold text-emerald-900">A meeting is live right now</h2>
+              <p className="text-sm text-emerald-700 mt-1">Join the meeting or monitor live task extraction in real time.</p>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const liveMeeting = meetings.find((meeting) => meeting.status === "live" && meeting.roomId);
+                if (liveMeeting?.roomId) {
+                  router.push(`/meetings/live?room=${encodeURIComponent(liveMeeting.roomId)}`);
+                }
+              }}
+            >
+              Join Live Meeting
+            </Button>
+          </div>
+        </Card>
+      ) : null}
 
       <div className="grid gap-6">
         {/* Upload Section */}

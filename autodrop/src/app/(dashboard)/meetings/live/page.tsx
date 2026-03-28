@@ -5,22 +5,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
+import { createLiveMeeting, fetchMeetingByRoomId, setMeetingStatus } from "@/lib/services/meetingService";
+import { Task, TranscriptSnippet } from "@/lib/types";
+import { Mic, MicOff, Video, StopCircle, Loader2, Zap } from "lucide-react";
 
 export default function LiveMeetingPage() {
   const router = useRouter();
+  const { currentWorkspace } = useWorkspace();
   const [roomId, setRoomId] = useState("");
   const [joinedRoomId, setJoinedRoomId] = useState("");
+  const [liveMeetingId, setLiveMeetingId] = useState<string | null>(null);
+  const [liveMeeting, setLiveMeeting] = useState<any | null>(null);
+  const [liveTranscript, setLiveTranscript] = useState<TranscriptSnippet[]>([]);
+  const [liveTasks, setLiveTasks] = useState<Task[]>([]);
+  const [isProcessingChunk, setIsProcessingChunk] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [userName, setUserName] = useState("AutoDrop User");
   const [isRecording, setIsRecording] = useState(false);
-  const [mediaRecorder, setMediaRecorder] = useState<MediaRecorder | null>(null);
+  const [isEnding, setIsEnding] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasJoinedFromQueryRef = useRef(false);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const zegoRef = useRef<any>(null);
+
+  // Web Speech API Ref
+  const recognitionRef = useRef<any>(null);
+  const transcriptBufferRef = useRef<string>("");
+  const lastProcessedTimeRef = useRef<number>(Date.now());
 
   useEffect(() => {
     return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
       zegoRef.current = null;
     };
   }, []);
@@ -92,6 +109,12 @@ export default function LiveMeetingPage() {
       });
 
       setJoinedRoomId(finalRoomId);
+      if (currentWorkspace?.id) {
+        const meeting = await createLiveMeeting(currentWorkspace.id, finalRoomId, `${finalUserName}'s meeting`);
+        if (meeting?.id) {
+          setLiveMeetingId(meeting.id);
+        }
+      }
       router.replace(`/meetings/live?room=${encodeURIComponent(finalRoomId)}`);
       toast.success(`Joined room ${finalRoomId}`);
     } catch (error) {
@@ -99,7 +122,7 @@ export default function LiveMeetingPage() {
     } finally {
       setIsJoining(false);
     }
-  }, [roomId, router, userName]);
+  }, [roomId, router, userName, currentWorkspace?.id]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -114,107 +137,320 @@ export default function LiveMeetingPage() {
     }
   }, [handleJoin]);
 
-  const handleStartRecording = async () => {
+  useEffect(() => {
+    if (!joinedRoomId) return;
+
+    const loadMeeting = async () => {
+      const meeting = await fetchMeetingByRoomId(joinedRoomId);
+      if (meeting) {
+        setLiveMeeting(meeting);
+        setLiveMeetingId(meeting.id);
+      }
+    };
+
+    void loadMeeting();
+    const interval = setInterval(loadMeeting, 5000);
+    return () => clearInterval(interval);
+  }, [joinedRoomId]);
+
+  const processTextChunk = async (text: string) => {
+    if (!currentWorkspace?.id || !liveMeetingId || !text.trim()) {
+      return;
+    }
+
+    setIsProcessingChunk(true);
+    const timestamp = new Date().toISOString();
+
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      const recorder = new MediaRecorder(stream);
-      const chunks: Blob[] = [];
+      const response = await fetch("/api/meetings/live/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId: currentWorkspace.id,
+          meetingId: liveMeetingId,
+          speaker: userName.trim() || "Speaker",
+          text: text,
+          time: timestamp,
+        }),
+      });
 
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunks.push(event.data);
-      };
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || "Task extraction failed");
+      }
 
-      recorder.onstop = async () => {
-        const blob = new Blob(chunks, { type: "video/webm" });
-        const timestamp = new Date().toISOString();
-        
-        // Save file locally
-        const url = URL.createObjectURL(blob);
-        const anchor = document.createElement("a");
-        anchor.href = url;
-        anchor.download = `recording_${joinedRoomId || "meeting"}_${timestamp}.webm`;
-        anchor.click();
-        URL.revokeObjectURL(url);
+      if (payload.transcript) {
+        setLiveTranscript((prev) => [...prev, payload.transcript]);
+      }
 
-        // Auto-upload and transcribe
-        try {
-          toast.info("Processing recording...");
-          const file = new File([blob], `meeting_${timestamp}.webm`, { type: "video/webm" });
-          const formData = new FormData();
-          formData.append("audio", file);
-
-          const response = await fetch("/api/transcribe", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.error || "Transcription failed");
-          }
-
-          await response.json();
-          toast.success("Meeting processed and tasks extracted automatically!");
-          
-          // Optionally redirect to meetings page to see the new meeting
-          setTimeout(() => {
-            window.location.href = "/meetings";
-          }, 2000);
-        } catch (error) {
-          toast.error(error instanceof Error ? error.message : "Failed to process meeting");
-        }
-      };
-
-      recorder.start();
-      setMediaRecorder(recorder);
-      setIsRecording(true);
-      toast.success("Recording started");
-    } catch {
-      toast.error("Could not start recording. Check browser permissions.");
+      if (Array.isArray(payload.tasks) && payload.tasks.length > 0) {
+        setLiveTasks((prev) => [...prev, ...payload.tasks]);
+        toast.success(`Extracted ${payload.tasks.length} new task(s)!`, {
+          icon: "⚡",
+        });
+      }
+    } catch (error) {
+      console.error("Live extract error:", error);
+      // Don't toast for everything in real-time to avoid spam
+    } finally {
+      setIsProcessingChunk(false);
     }
   };
 
+  const handleStartRecording = () => {
+    if (!joinedRoomId) {
+      toast.error("Join a room before starting live capture.");
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Your browser does not support Web Speech API. Please use Chrome.");
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event: any) => {
+      let interimTranscript = "";
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          const finalPart = event.results[i][0].transcript;
+          transcriptBufferRef.current += " " + finalPart;
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+
+      // Throttle: Send buffer every 15 seconds or if it gets too long
+      const now = Date.now();
+      if (now - lastProcessedTimeRef.current > 15000 && transcriptBufferRef.current.trim().length > 20) {
+        const textToProcess = transcriptBufferRef.current.trim();
+        transcriptBufferRef.current = "";
+        lastProcessedTimeRef.current = now;
+        void processTextChunk(textToProcess);
+      }
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      if (event.error === "not-allowed") {
+        toast.error("Microphone access denied.");
+        setIsRecording(false);
+      }
+    };
+
+    recognition.onend = () => {
+      if (isRecording) {
+        // Automatically restart if it was ended by the browser (not by user)
+        recognition.start();
+      }
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsRecording(true);
+    toast.success("Live AI Capture started. Proccessing speech in 15s windows.", {
+      icon: <Mic className="h-4 w-4 text-emerald-500" />,
+    });
+  };
+
   const handleStopRecording = () => {
-    mediaRecorder?.stop();
     setIsRecording(false);
-    toast.info("Stopping recording and processing audio...");
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    
+    // Flush remaining buffer
+    if (transcriptBufferRef.current.trim()) {
+      void processTextChunk(transcriptBufferRef.current.trim());
+      transcriptBufferRef.current = "";
+    }
+    
+    toast.info("Live capture stopped.");
+  };
+
+  const handleEndLiveMeeting = async () => {
+    if (!liveMeetingId) {
+      toast.error("No active live meeting to end.");
+      return;
+    }
+
+    setIsEnding(true);
+    try {
+      handleStopRecording();
+
+      const result = await setMeetingStatus(liveMeetingId, "completed", "Live session ended");
+      if (!result) {
+        throw new Error("Failed to finalize live meeting");
+      }
+
+      toast.success("Live meeting saved successfully.");
+      setLiveMeetingId(null);
+      setLiveTranscript([]);
+      setLiveTasks([]);
+      router.push("/meetings");
+    } catch (error) {
+      console.error("Failed to end live meeting:", error);
+      toast.error(error instanceof Error ? error.message : "Could not end live meeting");
+    } finally {
+      setIsEnding(false);
+    }
   };
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">Live Meeting</h1>
-      <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto_auto]">
-        <Input
-          placeholder="Enter room id"
-          value={roomId}
-          onChange={(event) => setRoomId(event.target.value)}
-        />
-        <Input
-          placeholder="Display name"
-          value={userName}
-          onChange={(event) => setUserName(event.target.value)}
-        />
-        <Button onClick={() => void handleJoin()} disabled={!roomId.trim() || isJoining}>
-          {isJoining ? "Joining..." : "Join"}
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">
+            Live Meeting
+            {isRecording && <span className="flex h-2 w-2 rounded-full bg-red-500 animate-pulse" />}
+          </h1>
+          <p className="text-muted-foreground font-medium">Capture intelligence in real-time.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          {!isRecording ? (
+            <Button 
+              onClick={handleStartRecording} 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-2xl h-11 px-6 shadow-lg shadow-emerald-500/20"
+              disabled={!joinedRoomId}
+            >
+              <Mic className="mr-2 h-4 w-4" />
+              Start AI Capture
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleStopRecording} 
+              variant="outline"
+              className="border-red-500/50 text-red-600 font-bold rounded-2xl h-11 px-6 hover:bg-red-50"
+            >
+              <MicOff className="mr-2 h-4 w-4" />
+              Stop AI Capture
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            onClick={handleEndLiveMeeting}
+            disabled={isEnding || !liveMeetingId}
+            className="rounded-2xl h-11 px-6 font-bold text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
+          >
+            {isEnding ? <Loader2 className="h-4 w-4 animate-spin" /> : <StopCircle className="mr-2 h-4 w-4" />}
+            End Meeting
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto_auto] items-end bg-white/5 border rounded-3xl p-4 shadow-sm">
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Room ID</label>
+          <Input
+            placeholder="e.g. strategy-q2"
+            value={roomId}
+            onChange={(event) => setRoomId(event.target.value)}
+            className="rounded-xl border-white/10 bg-black/5"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Your Name</label>
+          <Input
+            placeholder="Display name"
+            value={userName}
+            onChange={(event) => setUserName(event.target.value)}
+            className="rounded-xl border-white/10 bg-black/5"
+          />
+        </div>
+        <Button onClick={() => void handleJoin()} disabled={!roomId.trim() || isJoining} className="rounded-xl h-10 px-8 font-bold">
+          {isJoining ? <Loader2 className="h-4 w-4 animate-spin" /> : "Join"}
         </Button>
-        <Button variant="outline" onClick={handleCreateRoom} disabled={isJoining}>
-          Create Room
+        <Button variant="outline" onClick={handleCreateRoom} disabled={isJoining} className="rounded-xl h-10 px-6 font-bold border-white/10">
+          Create New
         </Button>
       </div>
 
-      <div ref={containerRef} className="w-full h-[65vh] rounded-lg border bg-black/5" />
-
-      {joinedRoomId && (
-        <div className="flex gap-2">
-          {!isRecording ? (
-            <Button variant="outline" onClick={handleStartRecording}>
-              Start Recording
-            </Button>
-          ) : (
-            <Button onClick={handleStopRecording}>Stop Recording</Button>
-          )}
+      <div className="grid gap-6 lg:grid-cols-[1.6fr_0.9fr]">
+        <div className="space-y-4">
+           <div 
+             ref={containerRef} 
+             className="w-full h-[60vh] rounded-[2.5rem] border bg-slate-950 overflow-hidden shadow-2xl shadow-primary/5 ring-1 ring-white/10" 
+           />
+           
+           <div className="rounded-[2.5rem] border bg-white/5 p-8 shadow-sm">
+             <div className="flex items-center justify-between mb-6">
+               <div>
+                 <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60 mb-1">Live Feed</p>
+                 <h2 className="text-xl font-bold tracking-tight">Transcription Buffer</h2>
+               </div>
+               <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10">
+                  {isProcessingChunk && <Loader2 className="h-3 w-3 animate-spin text-emerald-500" />}
+                  <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{liveTranscript.length} Segments</span>
+               </div>
+             </div>
+             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-4 scrollbar-hide">
+               {liveTranscript.length === 0 ? (
+                 <div className="rounded-[2rem] border-2 border-dashed border-white/5 bg-black/5 p-12 text-center">
+                   <div className="p-4 bg-white/5 rounded-2xl w-fit mx-auto mb-4">
+                      <Mic className="h-6 w-6 text-muted-foreground/30" />
+                   </div>
+                   <p className="text-sm font-bold text-muted-foreground/40 uppercase tracking-widest">Awaiting audio input...</p>
+                   <p className="text-xs text-muted-foreground/30 mt-2 italic">Start AI Capture to begin real-time extraction.</p>
+                 </div>
+               ) : (
+                 liveTranscript.map((snippet, index) => (
+                   <div key={`${snippet.time}-${index}`} className="group relative rounded-[1.5rem] border border-white/5 bg-background/50 p-6 hover:bg-white/[0.02] transition-colors">
+                     <div className="absolute left-0 top-6 w-1 h-8 bg-primary rounded-r-full opacity-0 group-hover:opacity-100 transition-opacity" />
+                     <div className="flex items-center justify-between gap-3 mb-3 text-[10px] font-black uppercase tracking-widest opacity-40">
+                       <span className="flex items-center gap-2 text-primary"><Mic className="h-3 w-3" /> {snippet.speaker}</span>
+                       <span>{new Date(snippet.time).toLocaleTimeString()}</span>
+                     </div>
+                     <p className="text-sm leading-relaxed font-medium text-foreground/90">{snippet.text}</p>
+                   </div>
+                 ))
+               )}
+             </div>
+           </div>
         </div>
-      )}
+
+        <div className="space-y-6">
+          <div className="rounded-[2.5rem] border bg-white/5 p-8 shadow-sm h-full">
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground/60 mb-1">AI Insights</p>
+                <h2 className="text-xl font-bold tracking-tight">Pending Tasks</h2>
+              </div>
+              <div className="h-10 w-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                 <Zap className="h-5 w-5 text-primary" />
+              </div>
+            </div>
+            
+            <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2 scrollbar-hide">
+              {liveTasks.length === 0 ? (
+                <div className="rounded-[2rem] border-2 border-dashed border-white/5 bg-black/5 p-12 text-center">
+                  <p className="text-sm font-bold text-muted-foreground/40 uppercase tracking-widest leading-relaxed">Intelligence will appear as commitments are made.</p>
+                </div>
+              ) : (
+                liveTasks.map((task) => (
+                  <div key={task.id || task.title} className="rounded-2xl border border-white/10 bg-black/20 p-5 shadow-inner transition-all hover:scale-[1.02] cursor-default border-l-4 border-l-primary">
+                    <div className="mb-3 text-sm font-bold tracking-tight leading-snug">{task.title}</div>
+                    <div className="flex flex-wrap items-center gap-2">
+                       <span className="px-2 py-0.5 rounded-full bg-primary/10 text-[9px] font-black uppercase tracking-widest text-primary border border-primary/20">
+                         {task.assignee || "Unassigned"}
+                       </span>
+                       {task.dueDate && (
+                         <span className="text-[10px] font-bold text-muted-foreground/60">
+                           {task.dueDate}
+                         </span>
+                       )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

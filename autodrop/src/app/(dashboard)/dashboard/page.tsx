@@ -6,19 +6,20 @@ import Link from "next/link"
 import { Video, CheckCircle2, Clock, ArrowRight } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import { useEffect, useMemo, useState } from "react"
-import { listMeetings } from "@/lib/services/meetingService"
+import { fetchLiveMeetings, listMeetings } from "@/lib/services/meetingService"
 import { fetchTasks } from "@/lib/services/taskService"
 import { Meeting, Task } from "@/lib/types"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed"
 import { toast } from "sonner"
-import { Mail } from "lucide-react"
+import { Mail, Zap } from "lucide-react"
 
 export default function DashboardPage() {
   const { user } = useUser()
   const { currentWorkspace, pendingInvitesCount, isLoading: isWorkspaceLoading } = useWorkspace()
   const [meetings, setMeetings] = useState<Meeting[]>([])
+  const [liveMeetings, setLiveMeetings] = useState<Meeting[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [isDataLoading, setIsDataLoading] = useState(true)
   const [isMounted, setIsMounted] = useState(false)
@@ -33,12 +34,14 @@ export default function DashboardPage() {
     async function loadData() {
       setIsDataLoading(true)
       try {
-        const [fetchedMeetings, fetchedTasks] = await Promise.all([
+        const [fetchedMeetings, fetchedTasks, fetchedLive] = await Promise.all([
           listMeetings(currentWorkspace!.id),
-          fetchTasks(currentWorkspace!.id)
+          fetchTasks(currentWorkspace!.id),
+          fetchLiveMeetings(currentWorkspace!.id)
         ])
         setMeetings(fetchedMeetings)
         setTasks(fetchedTasks)
+        setLiveMeetings(fetchedLive)
       } catch (error) {
         console.error("Error loading dashboard data:", error)
       } finally {
@@ -105,6 +108,41 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+      
+      {liveMeetings.length > 0 && (
+        <div className="relative overflow-hidden rounded-[2rem] border-2 border-emerald-500/20 bg-emerald-500/5 p-8 shadow-2xl shadow-emerald-500/5 group">
+           <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Zap className="h-24 w-24 text-emerald-500" />
+           </div>
+           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="flex items-center gap-6">
+                 <div className="relative">
+                    <div className="h-16 w-16 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/40">
+                       <Video className="h-8 w-8 text-white" />
+                    </div>
+                    <div className="absolute -top-1 -right-1 h-5 w-5 bg-white rounded-full flex items-center justify-center shadow-sm">
+                       <div className="h-3 w-3 bg-emerald-500 rounded-full animate-ping" />
+                    </div>
+                 </div>
+                 <div>
+                    <h2 className="text-2xl font-black text-emerald-950 tracking-tight leading-none mb-1">
+                       Session Live Now
+                    </h2>
+                    <p className="text-emerald-900/60 font-semibold text-sm">
+                       {liveMeetings[0].title} • {liveMeetings.length} active room(s)
+                    </p>
+                 </div>
+              </div>
+              <Link 
+                href={`/meetings/live?room=${encodeURIComponent(liveMeetings[0].id)}`}
+                className="inline-flex items-center justify-center h-14 px-8 rounded-2xl bg-emerald-500 text-white font-bold text-base shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all hover:scale-[1.02] active:scale-95"
+              >
+                 Join Live Session
+                 <ArrowRight className="ml-2 h-5 w-5" />
+              </Link>
+           </div>
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card className="relative overflow-hidden group border-none shadow-2xl shadow-primary/5">

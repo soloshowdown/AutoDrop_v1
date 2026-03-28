@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS public.meetings (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     workspace_id UUID REFERENCES public.workspaces(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
-    status TEXT CHECK (status IN ('processing', 'completed', 'failed')) DEFAULT 'processing',
+    room_id TEXT UNIQUE,
+    status TEXT CHECK (status IN ('processing', 'live', 'completed', 'failed')) DEFAULT 'processing',
     date TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     duration TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL

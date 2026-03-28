@@ -117,7 +117,7 @@ export default function KanbanBoardPage() {
   // Polling every 5 seconds for tasks (fallback for real-time)
   useEffect(() => {
     if (!currentWorkspace?.id) return
-    const interval = setInterval(() => loadTasks(), 5000)
+    const interval = setInterval(() => loadTasks(), 3000)
     return () => clearInterval(interval)
   }, [currentWorkspace?.id])
 

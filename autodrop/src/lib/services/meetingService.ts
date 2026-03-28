@@ -2,7 +2,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { ExtractedTask, Meeting, TranscriptSnippet } from "@/lib/types";
-import { createTask } from "@/lib/services/taskService";
+import { createTask, createTaskIfUnique } from "@/lib/services/taskService";
 
 function toTranscriptSegments(segments: Array<{ speaker?: string; text?: string }>): TranscriptSnippet[] {
   return segments.map((segment, index) => ({
@@ -24,6 +24,29 @@ export async function listMeetings(workspaceId: string): Promise<Meeting[]> {
 
   if (error) {
     console.error("Error fetching meetings:", error.message);
+    return [];
+  }
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    title: row.title,
+    date: row.date ?? row.created_at,
+    status: row.status,
+    duration: row.duration,
+    workspaceId: row.workspace_id,
+  }));
+}
+
+export async function fetchLiveMeetings(workspaceId: string): Promise<Meeting[]> {
+  const { data, error } = await supabase
+    .from("meetings")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("status", "live")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching live meetings:", error.message);
     return [];
   }
 
@@ -60,6 +83,71 @@ export async function getMeetingById(id: string): Promise<Meeting | null> {
       taskId: t.task_id,
     })),
   };
+}
+
+export async function createLiveMeeting(workspaceId: string, roomId: string, title?: string): Promise<Meeting | null> {
+  try {
+    const response = await fetch("/api/meetings/live", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ workspaceId, roomId, title }),
+    });
+
+    if (!response.ok) {
+      console.error("Failed to create live meeting", await response.text());
+      return null;
+    }
+
+    const meeting = await response.json();
+    return {
+      ...meeting,
+      date: meeting.date ?? meeting.created_at,
+    };
+  } catch (error) {
+    console.error("Error creating live meeting:", error);
+    return null;
+  }
+}
+
+export async function fetchMeetingByRoomId(roomId: string): Promise<Meeting | null> {
+  try {
+    const response = await fetch(`/api/meetings/room/${encodeURIComponent(roomId)}`);
+    if (!response.ok) {
+      return null;
+    }
+    const meeting = await response.json();
+    return {
+      ...meeting,
+      date: meeting.date ?? meeting.created_at,
+    };
+  } catch (error) {
+    console.error("Error fetching meeting by room id:", error);
+    return null;
+  }
+}
+
+export async function setMeetingStatus(meetingId: string, status: "processing" | "live" | "completed" | "failed", duration?: string): Promise<Meeting | null> {
+  try {
+    const response = await fetch(`/api/meetings/${meetingId}/status`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, duration }),
+    });
+
+    if (!response.ok) {
+      console.error("Failed to update meeting status", await response.text());
+      return null;
+    }
+
+    const meeting = await response.json();
+    return {
+      ...meeting,
+      date: meeting.date ?? meeting.created_at,
+    };
+  } catch (error) {
+    console.error("Error setting meeting status:", error);
+    return null;
+  }
 }
 
 export async function uploadAndProcessMeeting(file: File, workspaceId: string): Promise<Meeting> {
@@ -129,13 +217,14 @@ export async function uploadAndProcessMeeting(file: File, workspaceId: string): 
           .filter((task) => task.title?.trim())
           .map(async (task) => {
             try {
-              await createTask({
+              await createTaskIfUnique({
                 workspaceId,
                 title: task.title,
-                status: "To Do",
+                status: "Backlog",
                 priority: task.priority ?? "medium",
                 dueDate: task.deadline ?? undefined,
                 meetingId: initialMeeting.id,
+                meetingTitle: initialMeeting.title,
                 sourceType: "AI",
               });
             } catch (error) {

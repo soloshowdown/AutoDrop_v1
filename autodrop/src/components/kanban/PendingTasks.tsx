@@ -33,8 +33,8 @@ export function PendingTasks({ workspaceId, onTaskApproved, onEditTask }: Pendin
 
   useEffect(() => {
     loadPendingTasks();
-    // Poll every 5 seconds for new AI tasks
-    const interval = setInterval(loadPendingTasks, 5000);
+    // Poll every 3 seconds for new AI tasks
+    const interval = setInterval(loadPendingTasks, 3000);
     return () => clearInterval(interval);
   }, [workspaceId]);
 
@@ -80,12 +80,12 @@ export function PendingTasks({ workspaceId, onTaskApproved, onEditTask }: Pendin
         </div>
         <div>
           <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
-            Pending AI Tasks
+            Live Generated Tasks
             <Badge variant="secondary" className="bg-amber-500/10 text-amber-500 hover:bg-amber-500/20 rounded-full font-bold">
               {tasks.length} New
             </Badge>
           </h2>
-          <p className="text-sm text-muted-foreground font-medium">Review and approve tasks generated from your meetings.</p>
+          <p className="text-sm text-muted-foreground font-medium">Review, approve, edit, or reject tasks extracted automatically from live meeting audio.</p>
         </div>
       </div>
 

@@ -2,6 +2,7 @@
 
 import { supabase } from "@/lib/supabase";
 import { Task, TaskStatus } from "@/lib/types";
+import { normalizeTaskTitle } from "@/lib/taskUtils";
 import { logActivity } from "./activityService";
 
 function normalizeTask(row: any): Task {
@@ -79,6 +80,7 @@ export async function createTask(input: {
   meetingTitle?: string;
   sourceType?: "AI" | "User";
   transcriptTimestamp?: string;
+  approved?: boolean;
 }): Promise<void> {
   const { data: task, error } = await supabase.from("tasks").insert({
     workspace_id: input.workspaceId,
@@ -91,7 +93,7 @@ export async function createTask(input: {
     meeting_title: input.meetingTitle ?? null,
     source_type: input.sourceType ?? "User",
     transcript_timestamp: input.transcriptTimestamp ?? null,
-    approved: input.sourceType === "AI" ? false : true,
+    approved: input.approved ?? (input.sourceType === "AI" ? false : true),
   }).select().single();
 
   if (error) throw new Error(error.message);
@@ -104,6 +106,46 @@ export async function createTask(input: {
       target: input.title,
     });
   }
+}
+
+export async function taskExistsForMeeting(meetingId: string, title: string): Promise<boolean> {
+  const normalizedTitle = normalizeTaskTitle(title);
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("title")
+    .eq("meeting_id", meetingId);
+
+  if (error) {
+    console.error("Error checking task existence:", error.message);
+    throw new Error(error.message);
+  }
+
+  return (data ?? []).some((row: any) => normalizeTaskTitle(String(row.title || "")) === normalizedTitle);
+}
+
+export async function createTaskIfUnique(input: {
+  workspaceId: string;
+  title: string;
+  status?: TaskStatus;
+  priority?: "low" | "medium" | "high";
+  dueDate?: string;
+  assigneeId?: string;
+  meetingId?: string;
+  meetingTitle?: string;
+  sourceType?: "AI" | "User";
+  transcriptTimestamp?: string;
+  approved?: boolean;
+}): Promise<boolean> {
+  if (!input.meetingId) {
+    throw new Error("meetingId is required to create a unique AI task");
+  }
+
+  if (await taskExistsForMeeting(input.meetingId, input.title)) {
+    return false;
+  }
+
+  await createTask(input);
+  return true;
 }
 
 export async function updateTask(
