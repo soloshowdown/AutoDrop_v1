@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react"
 import { KanbanBoard } from "@/components/kanban/KanbanBoard"
 import { Button } from "@/components/ui/button"
-import { Plus, Filter, Download, Users } from "lucide-react"
 import { Task, TaskPriority } from "@/lib/types"
 import { createTask, fetchTasks, hasTaskBackendConfigured, updateTaskStatus, deleteTask, updateTask, subscribeToTasks } from "@/lib/services/taskService"
 import { exportTasksAsCSVFile, exportTasksAsJSONFile } from "@/lib/services/exportService"
 import { fetchWorkspaceMembers } from "@/lib/services/workspaceService"
 import { toast } from "sonner"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { PendingTasks } from "@/components/kanban/PendingTasks"
+import { useRef } from "react"
+import { Sparkles, Plus, Filter, Download, Users } from "lucide-react"
 import {
   Dialog,
   DialogContent,
@@ -42,12 +44,24 @@ export default function KanbanBoardPage() {
   const [editSourceType, setEditSourceType] = useState<"AI" | "User">("User")
   const [editMeetingTitle, setEditMeetingTitle] = useState("")
   const [editTranscriptTimestamp, setEditTranscriptTimestamp] = useState("")
+  const prevTasksCount = useRef(0)
+
+  const isAdmin = currentWorkspace?.role === 'admin';
 
   const loadTasks = async () => {
     if (!currentWorkspace?.id) return
     try {
       setLoading(true)
       const records = await fetchTasks(currentWorkspace.id)
+      
+      // If new tasks are detected, show a toast
+      if (records.length > prevTasksCount.current && prevTasksCount.current > 0) {
+        toast.info("New tasks added from meeting", {
+           description: "Check your Kanban board for the latest updates.",
+           icon: <Sparkles className="h-4 w-4 text-primary" />
+        })
+      }
+      prevTasksCount.current = records.length
       setTasks(records)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load tasks")
@@ -98,6 +112,13 @@ export default function KanbanBoardPage() {
     return () => {
       subscription.unsubscribe()
     }
+  }, [currentWorkspace?.id])
+
+  // Polling every 5 seconds for tasks (fallback for real-time)
+  useEffect(() => {
+    if (!currentWorkspace?.id) return
+    const interval = setInterval(() => loadTasks(), 5000)
+    return () => clearInterval(interval)
   }, [currentWorkspace?.id])
 
   if (isWorkspaceLoading) {
@@ -200,6 +221,14 @@ export default function KanbanBoardPage() {
            </Button>
         </div>
       </div>
+
+      {isAdmin && currentWorkspace?.id && (
+        <PendingTasks 
+          workspaceId={currentWorkspace.id} 
+          onTaskApproved={loadTasks} 
+          onEditTask={handleEditTask}
+        />
+      )}
 
       <div className="flex-1 overflow-hidden rounded-xl border bg-muted/10 p-4">
         {!hasTaskBackendConfigured() ? (

@@ -47,9 +47,10 @@ export async function GET(
 
     // 3. Fetch pending invitations
     const { data: invitations, error: invError } = await supabase
-      .from('invitations')
+      .from('invites')
       .select('id, email, role')
       .eq('workspace_id', workspaceId)
+      .eq('status', 'pending')
 
     if (invError) console.error('Error fetching invitations:', invError)
 
@@ -76,6 +77,52 @@ export async function GET(
     return NextResponse.json(combined, { status: 200 })
   } catch (error: any) {
     console.error('Error fetching members:', error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+  }
+}
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { userId: requesterId } = await auth()
+
+  if (!requesterId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const { id: workspaceId } = await params
+  const { searchParams } = new URL(req.url)
+  const targetUserId = searchParams.get('userId')
+
+  if (!targetUserId) {
+    return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+  }
+
+  try {
+    // 1. Check if requester is an admin
+    const { data: requesterMembership, error: reqError } = await supabase
+      .from('workspace_members')
+      .select('role')
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', requesterId)
+      .single()
+
+    if (reqError || requesterMembership?.role !== 'admin') {
+      return NextResponse.json({ error: 'Only admins can remove members' }, { status: 403 })
+    }
+
+    // 2. Remove the member
+    const { error: removeError } = await supabase
+      .from('workspace_members')
+      .delete()
+      .eq('workspace_id', workspaceId)
+      .eq('user_id', targetUserId)
+
+    if (removeError) throw removeError
+
+    return NextResponse.json({ message: 'Member removed successfully' }, { status: 200 })
+  } catch (error: any) {
+    console.error('Error removing member:', error)
     return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }

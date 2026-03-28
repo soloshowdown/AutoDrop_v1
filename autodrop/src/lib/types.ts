@@ -26,6 +26,7 @@ export interface Task {
   meetingTitle?: string;
   sourceType?: "AI" | "User";
   transcriptTimestamp?: string;
+  approved: boolean;
 }
 
 export interface TranscriptSnippet {

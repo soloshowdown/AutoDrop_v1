@@ -41,23 +41,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
           ws = [];
         }
 
-        // If user has no workspace, create a default one via the server API (bypasses RLS)
+        // If user has no workspace, we'll redirect to onboarding
         if (ws.length === 0) {
-          try {
-            const res = await fetch("/api/workspace/create", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ name: `${user.firstName || "My"}'s Workspace` }),
-            });
-            if (res.ok) {
-              const defaultWs: Workspace = await res.json();
-              ws = [defaultWs];
-            } else {
-              const errText = await res.text().catch(() => "Unknown error");
-              console.error("Failed to auto-create workspace:", errText);
-            }
-          } catch (createErr) {
-            console.error("Workspace auto-creation exception:", createErr);
+          const isInvitePage = typeof window !== "undefined" && window.location.pathname === "/invites";
+          const isOnboardingPage = typeof window !== "undefined" && window.location.pathname === "/onboarding";
+          
+          if (typeof window !== "undefined" && !isOnboardingPage && !isInvitePage) {
+            window.location.href = "/onboarding";
+            return;
           }
         }
 

@@ -18,6 +18,7 @@ function normalizeTask(row: any): Task {
     meetingId: row.meeting_id ? String(row.meeting_id) : undefined,
     meetingTitle: row.meeting_title ? String(row.meeting_title) : undefined,
     transcriptTimestamp: row.transcript_timestamp ? String(row.transcript_timestamp) : undefined,
+    approved: !!row.approved,
   };
 }
 
@@ -30,6 +31,7 @@ export async function fetchTasks(workspaceId: string): Promise<Task[]> {
     .from("tasks")
     .select("*, assignee:users!assignee_id(*)")
     .eq("workspace_id", workspaceId)
+    .eq("approved", true)
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -86,6 +88,7 @@ export async function createTask(input: {
     meeting_title: input.meetingTitle ?? null,
     source_type: input.sourceType ?? "User",
     transcript_timestamp: input.transcriptTimestamp ?? null,
+    approved: input.sourceType === "AI" ? false : true,
   }).select().single();
 
   if (error) throw new Error(error.message);
@@ -160,6 +163,31 @@ export function subscribeToTasks(
       }
     )
     .subscribe();
+}
+
+export async function approveTask(taskId: string): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ approved: true })
+    .eq("id", taskId);
+
+  if (error) throw new Error(error.message);
+}
+
+export async function fetchPendingTasks(workspaceId: string): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*, assignee:users!assignee_id(*)")
+    .eq("workspace_id", workspaceId)
+    .eq("approved", false)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error("Error fetching pending tasks:", error.message);
+    throw error;
+  }
+
+  return (data ?? []).map((r) => normalizeTask(r));
 }
 
 export function hasTaskBackendConfigured() {

@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
     status TEXT CHECK (status IN ('Backlog', 'To Do', 'In Progress', 'Done')) DEFAULT 'To Do',
     source_type TEXT CHECK (source_type IN ('AI', 'User')) DEFAULT 'User',
     transcript_timestamp TEXT,
+    approved BOOLEAN DEFAULT false,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
@@ -79,12 +80,13 @@ CREATE TABLE IF NOT EXISTS public.activity_log (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- 8. Invitations table
-CREATE TABLE IF NOT EXISTS public.invitations (
+-- 8. Invites table
+CREATE TABLE IF NOT EXISTS public.invites (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     workspace_id UUID REFERENCES public.workspaces(id) ON DELETE CASCADE,
     email TEXT NOT NULL,
     role TEXT CHECK (role IN ('admin', 'member')) DEFAULT 'member',
+    status TEXT CHECK (status IN ('pending', 'accepted', 'rejected')) DEFAULT 'pending',
     invited_by TEXT REFERENCES public.users(id) ON DELETE SET NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
     UNIQUE(workspace_id, email)
@@ -98,4 +100,4 @@ ALTER TABLE public.meetings DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.transcripts DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.activity_log DISABLE ROW LEVEL SECURITY;
-ALTER TABLE public.invitations DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invites DISABLE ROW LEVEL SECURITY;

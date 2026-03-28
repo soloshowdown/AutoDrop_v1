@@ -8,15 +8,21 @@ import { UserPlus, Circle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { InviteModal } from "./InviteModal";
+import { Trash2, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { useUser } from "@clerk/nextjs";
 
 export function TeamList() {
   const { currentWorkspace } = useWorkspace();
+  const { user } = useUser();
   const [members, setMembers] = useState<any[]>([]);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isRemoving, setIsRemoving] = useState<string | null>(null);
 
-  useEffect(() => {
+  const isAdmin = currentWorkspace?.role === 'admin';
+
+  const fetchMembers = () => {
     if (!currentWorkspace?.id) return;
-    
     fetch(`/api/workspace/${currentWorkspace.id}/members`)
       .then((res) => res.json())
       .then((data) => {
@@ -25,7 +31,39 @@ export function TeamList() {
         }
       })
       .catch((err) => console.error("Failed to fetch members:", err));
+  };
+
+  useEffect(() => {
+    fetchMembers();
   }, [currentWorkspace?.id]);
+
+  const handleRemoveMember = async (memberId: string, isInvite: boolean) => {
+    if (!currentWorkspace?.id) return;
+    
+    setIsRemoving(memberId);
+    try {
+      if (isInvite) {
+        // We'll need a separate invite deletion logic if we want to remove pending invites
+        // For now, let's focus on members
+        toast.error("Invite removal not yet implemented specifically, but you can manage invites in the invites page.");
+      } else {
+        const res = await fetch(`/api/workspace/${currentWorkspace.id}/members?userId=${memberId}`, {
+          method: "DELETE",
+        });
+        if (res.ok) {
+          toast.success("Member removed.");
+          fetchMembers();
+        } else {
+          const err = await res.json();
+          toast.error(err.error || "Failed to remove member");
+        }
+      }
+    } catch (err) {
+      toast.error("Failed to remove member");
+    } finally {
+      setIsRemoving(null);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-4 py-4 px-2">
@@ -64,9 +102,9 @@ export function TeamList() {
                 )} 
               />
             </div>
-            <div className="flex flex-col min-w-0 overflow-hidden">
+            <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
               <span className="text-xs font-semibold truncate group-hover:text-primary transition-colors">
-                {member.name}
+                {member.name} {member.id === user?.id && "(You)"}
               </span>
               <div className="flex items-center gap-2">
                 <span className="text-[9px] text-muted-foreground font-medium uppercase tracking-wider">
@@ -79,6 +117,20 @@ export function TeamList() {
                 )}
               </div>
             </div>
+            {isAdmin && member.id !== user?.id && member.status !== 'pending' && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRemoveMember(member.id, false);
+                }}
+                disabled={isRemoving === member.id}
+              >
+                {isRemoving === member.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              </Button>
+            )}
           </div>
         ))}
       </div>

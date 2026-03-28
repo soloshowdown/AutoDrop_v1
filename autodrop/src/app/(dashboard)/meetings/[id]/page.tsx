@@ -15,19 +15,40 @@ export default function MeetingDetailPage() {
     const id = params?.id
     if (!id) return
 
+    let intervalId: NodeJS.Timeout
+
     async function loadMeeting() {
-      setLoading(true)
       try {
         const data = await getMeetingById(id)
+        if (!data) {
+          setLoading(false)
+          return
+        }
         setMeeting(data)
+        setLoading(false)
+
+        if (data.status === "processing") {
+          if (!intervalId) {
+            intervalId = setInterval(loadMeeting, 3000)
+          }
+        } else {
+           if (intervalId) {
+             clearInterval(intervalId)
+             // No need to clear intervalId variable since it's local
+           }
+        }
       } catch (error) {
         console.error("Error loading meeting:", error)
-      } finally {
         setLoading(false)
+        if (intervalId) clearInterval(intervalId)
       }
     }
 
     loadMeeting()
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
   }, [params?.id])
 
   if (loading) {
@@ -48,7 +69,8 @@ export default function MeetingDetailPage() {
     dueDate: task.deadline ?? undefined,
     meetingId: meeting.id,
     sourceType: "AI",
-    priority: task.priority || "medium"
+    priority: task.priority || "medium",
+    approved: false,
   }))
 
   return (
