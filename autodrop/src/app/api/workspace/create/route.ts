@@ -16,23 +16,47 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Workspace name is required' }, { status: 400 })
     }
 
-    // 0. Ensure the user exists in Supabase (in case the Clerk webhook hasn't fired yet)
+    // 1. Check for pending invitations (Double-check in case webhook is slow)
     const clerkUser = await currentUser()
-    if (clerkUser) {
-      const email = clerkUser.emailAddresses[0]?.emailAddress ?? ''
-      const fullName = `${clerkUser.firstName ?? ''} ${clerkUser.lastName ?? ''}`.trim() || 'Anonymous'
-      await supabaseAdmin.from('users').upsert(
-        {
-          id: userId,
-          email,
-          name: fullName,
-          avatar_url: clerkUser.imageUrl,
-        },
-        { onConflict: 'id' }
-      )
+    if (!clerkUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+    const email = clerkUser.emailAddresses[0]?.emailAddress ?? ''
+    const fullName = `${clerkUser.firstName ?? ''} ${clerkUser.lastName ?? ''}`.trim() || 'Anonymous'
+
+    // First, ensure user exists in our DB
+    await supabaseAdmin.from('users').upsert(
+      { id: userId, email, name: fullName, avatar_url: clerkUser.imageUrl },
+      { onConflict: 'id' }
+    )
+
+    const { data: invitations } = await supabaseAdmin
+      .from('invitations')
+      .select('*')
+      .eq('email', email)
+
+    if (invitations && invitations.length > 0) {
+      // User has an invitation! Join them to the FIRST one and return it
+      const invite = invitations[0]
+      const { data: workspace, error: joinError } = await supabaseAdmin
+        .from('workspace_members')
+        .insert({
+          workspace_id: invite.workspace_id,
+          user_id: userId,
+          role: invite.role,
+        })
+        .select('workspaces(*)')
+        .single()
+
+      if (!joinError) {
+        // Delete invitation
+        await supabaseAdmin.from('invitations').delete().eq('id', invite.id)
+        
+        // Return the joined workspace
+        return NextResponse.json((workspace as any).workspaces, { status: 200 })
+      }
     }
 
-    // 1. Create the workspace
+    // 2. If no invitation or join failed, create a new personal workspace
     const { data: workspace, error: wsError } = await supabaseAdmin
       .from('workspaces')
       .insert({

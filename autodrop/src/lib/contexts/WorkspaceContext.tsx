@@ -65,7 +65,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
 
         if (typeof window !== "undefined") {
           const lastWsId = localStorage.getItem("autodrop_last_workspace_id");
-          const found = ws.find((w) => w.id === lastWsId) || ws[0];
+          let found = ws.find((w) => w.id === lastWsId);
+          
+          if (!found) {
+            // Prioritize workspaces where the user is a member (invited) over personal ones
+            found = ws.find((w) => w.created_by !== user.id) || ws[0];
+          }
+          
           setCurrentWorkspace(found || null);
         } else {
           setCurrentWorkspace(ws[0] || null);
