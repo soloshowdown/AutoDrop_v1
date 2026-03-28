@@ -17,9 +17,12 @@ export function TeamList() {
   useEffect(() => {
     if (!currentWorkspace?.id) return;
     
-    fetchWorkspaceMembers(currentWorkspace.id)
+    fetch(`/api/workspace/${currentWorkspace.id}/members`)
+      .then((res) => res.json())
       .then((data) => {
-        setMembers(data);
+        if (Array.isArray(data)) {
+          setMembers(data);
+        }
       })
       .catch((err) => console.error("Failed to fetch members:", err));
   }, [currentWorkspace?.id]);
