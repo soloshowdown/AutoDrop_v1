@@ -120,6 +120,7 @@ export async function fetchMeetingByRoomId(roomId: string): Promise<Meeting | nu
     return {
       ...meeting,
       date: meeting.date ?? meeting.created_at,
+      roomId: meeting.room_id,
     };
   } catch (error) {
     console.error("Error fetching meeting by room id:", error);
