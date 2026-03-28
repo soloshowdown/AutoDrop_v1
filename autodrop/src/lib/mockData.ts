@@ -32,6 +32,7 @@ export const mockTasks: Task[] = [
     dueDate: "2023-10-20",
     assignee: "Alice",
     meetingId: "m-1",
+    approved: true,
   },
   {
     id: "t-2",
@@ -40,6 +41,7 @@ export const mockTasks: Task[] = [
     dueDate: "2023-10-18",
     assignee: "Bob",
     meetingId: "m-2",
+    approved: true,
   },
   {
     id: "t-3",
@@ -48,6 +50,7 @@ export const mockTasks: Task[] = [
     dueDate: "2023-10-15",
     assignee: "Charlie",
     meetingId: "m-3",
+    approved: true,
   },
   {
     id: "t-4",
@@ -56,6 +59,7 @@ export const mockTasks: Task[] = [
     dueDate: "2023-10-25",
     assignee: "Alice",
     meetingId: "m-1",
+    approved: true,
   },
 ]
 
