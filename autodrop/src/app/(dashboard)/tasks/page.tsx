@@ -30,6 +30,49 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
+const MOCK_TASKS: Task[] = [
+  {
+    id: "mock-1",
+    title: "[DEMO] Update project documentation",
+    status: "To Do",
+    priority: "medium",
+    assignee: "Kunal",
+    sourceType: "AI",
+    meetingTitle: "Strategy Sync",
+    meetingId: "m1",
+    approved: true
+  },
+  {
+    id: "mock-2",
+    title: "[DEMO] Implement real-time notifications",
+    status: "In Progress",
+    priority: "high",
+    assignee: "Alice",
+    sourceType: "User",
+    approved: true
+  },
+  {
+    id: "mock-3",
+    title: "[DEMO] Fix bug in authentication flow",
+    status: "Done",
+    priority: "high",
+    assignee: "Bob",
+    sourceType: "AI",
+    meetingTitle: "Backend Triage",
+    meetingId: "m2",
+    approved: true
+  },
+  {
+    id: "mock-4",
+    title: "[DEMO] Design new landing page",
+    status: "Backlog",
+    priority: "low",
+    assignee: "Sarah",
+    sourceType: "User",
+    approved: false
+  }
+];
+
 export default function KanbanBoardPage() {
   const { currentWorkspace, isLoading: isWorkspaceLoading } = useWorkspace()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -62,7 +105,7 @@ export default function KanbanBoardPage() {
         })
       }
       prevTasksCount.current = records.length
-      setTasks(records)
+      setTasks(records.length > 0 ? records : MOCK_TASKS)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load tasks")
     } finally {
@@ -96,8 +139,9 @@ export default function KanbanBoardPage() {
       if (payload.eventType === "INSERT") {
         const newTask = payload.new as Task
         setTasks((prev) => {
-          if (prev.find((t) => t.id === newTask.id)) return prev
-          return [...prev, newTask]
+          const filtered = prev.filter(t => !t.id.startsWith('mock-'))
+          if (filtered.find((t) => t.id === newTask.id)) return prev
+          return [...filtered, newTask]
         })
         toast.info("New task added")
       } else if (payload.eventType === "UPDATE") {
@@ -117,7 +161,7 @@ export default function KanbanBoardPage() {
   // Polling every 5 seconds for tasks (fallback for real-time)
   useEffect(() => {
     if (!currentWorkspace?.id) return
-    const interval = setInterval(() => loadTasks(), 3000)
+    const interval = setInterval(() => loadTasks(), 15000)
     return () => clearInterval(interval)
   }, [currentWorkspace?.id])
 

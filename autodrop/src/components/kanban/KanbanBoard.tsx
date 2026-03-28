@@ -107,51 +107,50 @@ export function KanbanBoard({
     const { active, over } = event;
     if (!over) return;
 
-    const activeId = active.id;
-    const overId = over.id;
-
-    if (activeId === overId) return;
-
     const isActiveTask = active.data.current?.type === "Task";
     const isOverTask = over.data.current?.type === "Task";
     const isOverColumn = over.data.current?.type === "Column";
 
     if (!isActiveTask) return;
 
-    // Dropping a Task over another Task
+    // 1. Moving over another Task
     if (isActiveTask && isOverTask) {
-      const activeTask = tasks.find((t) => t.id === activeId);
-      if (!activeTask) return;
-
-      const targetStatus =
-        isOverTask
-          ? tasks.find((t) => t.id === overId)?.status
-          : isOverColumn
-          ? (overId as TaskStatus)
-          : undefined;
-
-      if (targetStatus && targetStatus !== activeTask.status) {
-        void onTaskStatusChange?.(activeTask.id, targetStatus);
-      }
-
-      /* noop: visual movement is handled by server/state refresh */
+      // Visual feedback only
       return;
     }
 
-    // Dropping a Task over a Column
+    // 2. Moving over a Column
     if (isActiveTask && isOverColumn) {
-      const currentTask = tasks.find((t) => t.id === activeId);
-      const newStatus = overId as TaskStatus;
-      if (currentTask && currentTask.status !== newStatus) {
-        void onTaskStatusChange?.(currentTask.id, newStatus);
-      }
+       // Visual feedback only
+       return;
     }
   }
 
   function onDragEnd(event: DragEndEvent) {
     setActiveTask(null);
-    const { over } = event;
+    const { active, over } = event;
     if (!over) return;
+
+    const activeId = active.id;
+    const overId = over.id;
+
+    const activeTaskData = active.data.current?.task as Task;
+    if (!activeTaskData) return;
+
+    const isOverColumn = over.data.current?.type === "Column";
+    const isOverTask = over.data.current?.type === "Task";
+
+    let newStatus: TaskStatus | undefined;
+
+    if (isOverColumn) {
+      newStatus = overId as TaskStatus;
+    } else if (isOverTask) {
+      newStatus = over.data.current?.task.status as TaskStatus;
+    }
+
+    if (newStatus && newStatus !== activeTaskData.status) {
+      void onTaskStatusChange?.(String(activeId), newStatus);
+    }
   }
 
   const clearFilters = () => {

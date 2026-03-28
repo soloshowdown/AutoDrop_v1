@@ -149,7 +149,7 @@ export function TaskCard({ task, isOverlay, onEdit, onDelete }: TaskCardProps) {
                   <Avatar size="sm" className="h-7 w-7 border-2 border-background shadow-sm hover:scale-110 transition-transform cursor-pointer">
                     <AvatarImage src="" />
                     <AvatarFallback className="text-[9px] font-bold bg-primary/10 text-primary uppercase">
-                      {task.assignee.substring(0, 2).toUpperCase()}
+                      {task.assignee ? task.assignee.substring(0, 2).toUpperCase() : "??"}
                     </AvatarFallback>
                   </Avatar>
                   <div className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-background bg-green-500 shadow-sm" />
