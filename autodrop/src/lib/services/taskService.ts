@@ -35,6 +35,9 @@ export async function fetchTasks(workspaceId: string): Promise<Task[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
+    if (error.message.includes('column "approved" does not exist')) {
+      console.error("CRITICAL: 'approved' column missing in 'tasks' table. Run migrations.");
+    }
     console.error("Error fetching tasks:", error.message);
     throw error;
   }
@@ -183,6 +186,9 @@ export async function fetchPendingTasks(workspaceId: string): Promise<Task[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
+    if (error.message.includes('column "approved" does not exist')) {
+      console.error("CRITICAL: 'approved' column missing in 'tasks' table. Run migrations.");
+    }
     console.error("Error fetching pending tasks:", error.message);
     throw error;
   }

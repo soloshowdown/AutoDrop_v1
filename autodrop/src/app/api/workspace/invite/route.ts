@@ -16,6 +16,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Workspace ID and Email are required' }, { status: 400 })
     }
 
+    const targetEmail = email.toLowerCase()
+
     // 1. Check if requester is an admin of the workspace
     const { data: member, error: memberError } = await supabase
       .from('workspace_members')
@@ -42,7 +44,7 @@ export async function POST(req: Request) {
       .from('invites')
       .insert({
         workspace_id: workspaceId,
-        email: email,
+        email: targetEmail,
         role: role,
         invited_by: requesterId,
         status: 'pending'
@@ -57,13 +59,17 @@ export async function POST(req: Request) {
 
     // 3. Send the invitation email via Resend
     try {
+      if (!process.env.RESEND_API_KEY) {
+        console.warn('RESEND_API_KEY is not set. Skipping invitation email.');
+        return NextResponse.json({ message: 'Invitation stored but email could not be sent (API key missing)' }, { status: 200 })
+      }
       const { resend } = await import('@/lib/resend')
       const origin = req.headers.get('origin') || 'https://auto-drop-v1.vercel.app'
       const inviteUrl = `${origin}/invites` // Pointing to the new invite inbox
 
       await resend.emails.send({
         from: 'AutoDrop <onboarding@resend.dev>',
-        to: email,
+        to: targetEmail,
         subject: `You've been invited to join ${workspace.name} on AutoDrop`,
         html: `
           <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 12px; background-color: #ffffff;">

@@ -22,7 +22,9 @@ export default function InvitesPage() {
 
     async function loadInvites() {
       try {
-        const data = await fetchPendingInvites(user!.emailAddresses[0].emailAddress);
+        const email = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress;
+        if (!email) return;
+        const data = await fetchPendingInvites(email.toLowerCase());
         setInvites(data);
       } catch (error) {
         console.error("Error loading invites:", error);

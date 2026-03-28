@@ -87,7 +87,7 @@ export async function sendInvite(workspaceId: string, email: string, role: "admi
     .from("invites")
     .insert({
       workspace_id: workspaceId,
-      email,
+      email: email.toLowerCase(),
       role,
       invited_by: invitedBy,
       status: "pending"
@@ -106,7 +106,7 @@ export async function fetchPendingInvites(email: string) {
   const { data, error } = await supabase
     .from("invites")
     .select("*, workspaces(name)")
-    .eq("email", email)
+    .eq("email", email.toLowerCase())
     .eq("status", "pending");
 
   if (error) {
