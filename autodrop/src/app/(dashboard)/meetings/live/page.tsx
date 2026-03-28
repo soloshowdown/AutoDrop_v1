@@ -8,7 +8,7 @@ import { toast } from "sonner";
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
 import { createLiveMeeting, fetchMeetingByRoomId, setMeetingStatus } from "@/lib/services/meetingService";
 import { Task, TranscriptSnippet } from "@/lib/types";
-import { Mic, MicOff, Video, StopCircle, Loader2, Zap } from "lucide-react";
+import { Mic, MicOff, Video, StopCircle, Loader2, Zap, Check } from "lucide-react";
 
 export default function LiveMeetingPage() {
   const router = useRouter();
@@ -32,6 +32,43 @@ export default function LiveMeetingPage() {
   const recognitionRef = useRef<any>(null);
   const transcriptBufferRef = useRef<string>("");
   const lastProcessedTimeRef = useRef<number>(Date.now());
+
+  const [interimTranscript, setInterimTranscript] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (currentWorkspace) {
+      setIsAdmin(currentWorkspace.role === 'admin');
+    }
+  }, [currentWorkspace]);
+
+  const loadWorkspaceData = useCallback(async () => {
+    if (!joinedRoomId || !currentWorkspace?.id) return;
+    
+    // 1. Sync meeting
+    const { fetchMeetingByRoomId } = await import("@/lib/services/meetingService");
+    const meeting = await fetchMeetingByRoomId(joinedRoomId);
+    if (meeting) {
+      setLiveMeeting(meeting);
+      setLiveMeetingId(meeting.id);
+    }
+
+    // 2. Fetch pending tasks for this meeting
+    const { fetchPendingTasks } = await import("@/lib/services/taskService");
+    const pending = await fetchPendingTasks(currentWorkspace.id);
+    const meetingTasks = meeting 
+      ? pending.filter(t => t.meetingId === meeting.id)
+      : pending;
+    
+    setLiveTasks(meetingTasks);
+  }, [joinedRoomId, currentWorkspace?.id]);
+
+  useEffect(() => {
+    if (!joinedRoomId) return;
+    void loadWorkspaceData();
+    const interval = setInterval(loadWorkspaceData, 4000);
+    return () => clearInterval(interval);
+  }, [joinedRoomId, loadWorkspaceData]);
 
   useEffect(() => {
     return () => {
@@ -137,22 +174,6 @@ export default function LiveMeetingPage() {
     }
   }, [handleJoin]);
 
-  useEffect(() => {
-    if (!joinedRoomId) return;
-
-    const loadMeeting = async () => {
-      const meeting = await fetchMeetingByRoomId(joinedRoomId);
-      if (meeting) {
-        setLiveMeeting(meeting);
-        setLiveMeetingId(meeting.id);
-      }
-    };
-
-    void loadMeeting();
-    const interval = setInterval(loadMeeting, 5000);
-    return () => clearInterval(interval);
-  }, [joinedRoomId]);
-
   const processTextChunk = async (text: string) => {
     if (!currentWorkspace?.id || !liveMeetingId || !text.trim()) {
       return;
@@ -184,8 +205,8 @@ export default function LiveMeetingPage() {
       }
 
       if (Array.isArray(payload.tasks) && payload.tasks.length > 0) {
-        setLiveTasks((prev) => [...prev, ...payload.tasks]);
-        toast.success(`Extracted ${payload.tasks.length} new task(s)!`, {
+        await loadWorkspaceData();
+        toast.success(`Extracted ${payload.tasks.length} new insight(s)!`, {
           icon: "⚡",
         });
       }
@@ -215,15 +236,17 @@ export default function LiveMeetingPage() {
     recognition.lang = "en-US";
 
     recognition.onresult = (event: any) => {
-      let interimTranscript = "";
+      let interim = "";
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
           const finalPart = event.results[i][0].transcript;
           transcriptBufferRef.current += " " + finalPart;
+          setInterimTranscript("");
         } else {
-          interimTranscript += event.results[i][0].transcript;
+          interim += event.results[i][0].transcript;
         }
       }
+      setInterimTranscript(interim);
 
       // Throttle: Send buffer every 15 seconds or if it gets too long
       const now = Date.now();
@@ -298,6 +321,27 @@ export default function LiveMeetingPage() {
       toast.error(error instanceof Error ? error.message : "Could not end live meeting");
     } finally {
       setIsEnding(false);
+    }
+  };
+
+  const handleApproveLiveTask = async (taskId: string) => {
+    const { approveTask } = await import("@/lib/services/taskService");
+    try {
+      await approveTask(taskId);
+      toast.success("Task sent to Kanban!");
+      setLiveTasks(prev => prev.filter(t => t.id !== taskId));
+    } catch (error) {
+      toast.error("Failed to approve task");
+    }
+  };
+
+  const handleDeleteLiveTask = async (taskId: string) => {
+    const { deleteTask } = await import("@/lib/services/taskService");
+    try {
+      await deleteTask(taskId);
+      setLiveTasks(prev => prev.filter(t => t.id !== taskId));
+    } catch (error) {
+      toast.error("Failed to delete task");
     }
   };
 
@@ -389,7 +433,16 @@ export default function LiveMeetingPage() {
                </div>
              </div>
              <div className="space-y-4 max-h-[400px] overflow-y-auto pr-4 scrollbar-hide">
-               {liveTranscript.length === 0 ? (
+               {interimTranscript && (
+                 <div className="rounded-[1.5rem] border border-primary/20 bg-primary/5 p-6 animate-pulse">
+                    <div className="flex items-center gap-2 mb-2 text-[10px] font-black uppercase tracking-widest text-primary/70">
+                      <Zap className="h-3 w-3" /> Capturing...
+                    </div>
+                    <p className="text-sm italic text-foreground/70">{interimTranscript}</p>
+                 </div>
+               )}
+
+               {liveTranscript.length === 0 && !interimTranscript ? (
                  <div className="rounded-[2rem] border-2 border-dashed border-white/5 bg-black/5 p-12 text-center">
                    <div className="p-4 bg-white/5 rounded-2xl w-fit mx-auto mb-4">
                       <Mic className="h-6 w-6 text-muted-foreground/30" />
@@ -398,7 +451,7 @@ export default function LiveMeetingPage() {
                    <p className="text-xs text-muted-foreground/30 mt-2 italic">Start AI Capture to begin real-time extraction.</p>
                  </div>
                ) : (
-                 liveTranscript.map((snippet, index) => (
+                 [...liveTranscript].reverse().map((snippet, index) => (
                    <div key={`${snippet.time}-${index}`} className="group relative rounded-[1.5rem] border border-white/5 bg-background/50 p-6 hover:bg-white/[0.02] transition-colors">
                      <div className="absolute left-0 top-6 w-1 h-8 bg-primary rounded-r-full opacity-0 group-hover:opacity-100 transition-opacity" />
                      <div className="flex items-center justify-between gap-3 mb-3 text-[10px] font-black uppercase tracking-widest opacity-40">
@@ -432,16 +485,34 @@ export default function LiveMeetingPage() {
                 </div>
               ) : (
                 liveTasks.map((task) => (
-                  <div key={task.id || task.title} className="rounded-2xl border border-white/10 bg-black/20 p-5 shadow-inner transition-all hover:scale-[1.02] cursor-default border-l-4 border-l-primary">
+                  <div key={task.id} className="group relative rounded-2xl border border-white/10 bg-black/20 p-5 shadow-inner transition-all hover:bg-black/30 border-l-4 border-l-primary">
                     <div className="mb-3 text-sm font-bold tracking-tight leading-snug">{task.title}</div>
-                    <div className="flex flex-wrap items-center gap-2">
-                       <span className="px-2 py-0.5 rounded-full bg-primary/10 text-[9px] font-black uppercase tracking-widest text-primary border border-primary/20">
-                         {task.assignee || "Unassigned"}
-                       </span>
-                       {task.dueDate && (
-                         <span className="text-[10px] font-bold text-muted-foreground/60">
-                           {task.dueDate}
+                    <div className="flex items-center justify-between gap-2">
+                       <div className="flex flex-wrap items-center gap-2">
+                         <span className="px-2 py-0.5 rounded-full bg-primary/10 text-[9px] font-black uppercase tracking-widest text-primary border border-primary/20">
+                           {task.assignee || "Unassigned"}
                          </span>
+                       </div>
+                       
+                       {isAdmin && (
+                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              onClick={() => handleDeleteLiveTask(task.id)}
+                              className="h-7 w-7 rounded-lg hover:bg-red-500/10 hover:text-red-500"
+                            >
+                              <StopCircle className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button 
+                              size="icon" 
+                              variant="ghost" 
+                              onClick={() => handleApproveLiveTask(task.id)}
+                              className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500 hover:text-white"
+                            >
+                              <Check className="h-3.5 w-3.5" />
+                            </Button>
+                         </div>
                        )}
                     </div>
                   </div>
