@@ -49,7 +49,8 @@ export default function MeetingDetailClient({
            status: "To Do",
            dueDate: "Next week",
            assignee: "AutoAssigned",
-           meetingId: meeting.id
+           meetingId: meeting.id,
+           approved: false,
          }])
       }
     }, 2000)
