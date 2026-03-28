@@ -34,6 +34,7 @@ export async function listMeetings(workspaceId: string): Promise<Meeting[]> {
     status: row.status,
     duration: row.duration,
     workspaceId: row.workspace_id,
+    roomId: row.room_id,
   }));
 }
 

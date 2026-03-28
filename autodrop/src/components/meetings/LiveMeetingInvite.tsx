@@ -35,29 +35,14 @@ export function LiveMeetingInvite() {
     };
 
     void checkLiveMeetings();
+    const interval = setInterval(checkLiveMeetings, 10000);
 
     const subscription = subscribeToMeetings(currentWorkspace.id, (payload) => {
-      if (payload.eventType === "INSERT" || (payload.eventType === "UPDATE" && payload.new.status === "live")) {
-        const m = payload.new;
-        if (m.status === "live") {
-          setLiveMeeting({
-            id: m.id,
-            title: m.title,
-            status: m.status,
-            roomId: m.room_id,
-            date: m.date || m.created_at,
-            duration: m.duration
-          });
-          setIsVisible(true);
-        }
-      } else if (payload.eventType === "UPDATE" && payload.new.status !== "live") {
-        setIsVisible(false);
-      } else if (payload.eventType === "DELETE") {
-        setIsVisible(false);
-      }
+      void checkLiveMeetings();
     });
 
     return () => {
+      clearInterval(interval);
       subscription.unsubscribe();
     };
   }, [currentWorkspace?.id, pathname]);

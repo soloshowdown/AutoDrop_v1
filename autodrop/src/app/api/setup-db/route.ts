@@ -114,6 +114,38 @@ DO $$ BEGIN
   ) THEN
     ALTER TABLE team_members ADD COLUMN email text;
   END IF;
+
+  -- Ensure meetings table exists
+  CREATE TABLE IF NOT EXISTS meetings (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id uuid REFERENCES workspaces(id) ON DELETE CASCADE,
+    title text NOT NULL,
+    file_url text,
+    status text DEFAULT 'completed',
+    duration text,
+    room_id text,
+    created_at timestamptz DEFAULT now()
+  );
+
+  -- Add room_id to meetings if missing
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'meetings' AND column_name = 'room_id'
+  ) THEN
+    ALTER TABLE meetings ADD COLUMN room_id text;
+  END IF;
+
+  -- Ensure transcripts table exists
+  CREATE TABLE IF NOT EXISTS transcripts (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    meeting_id uuid REFERENCES meetings(id) ON DELETE CASCADE,
+    speaker text,
+    text text,
+    time text,
+    is_actionable boolean DEFAULT false,
+    task_id uuid REFERENCES tasks(id) ON DELETE SET NULL,
+    created_at timestamptz DEFAULT now()
+  );
 END $$;
 `;
 
