@@ -2,11 +2,12 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { Workspace, fetchUserWorkspaces } from "@/lib/services/workspaceService";
+import { Workspace, fetchUserWorkspaces, fetchPendingInvitesCount } from "@/lib/services/workspaceService";
 
 interface WorkspaceContextType {
   currentWorkspace: Workspace | null;
   workspaces: Workspace[];
+  pendingInvitesCount: number;
   isLoading: boolean;
   switchWorkspace: (workspaceId: string) => void;
 }
@@ -17,6 +18,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const { user, isLoaded } = useUser();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [currentWorkspace, setCurrentWorkspace] = useState<Workspace | null>(null);
+  const [pendingInvitesCount, setPendingInvitesCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
 
   const [isMounted, setIsMounted] = useState(false);
@@ -50,6 +52,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
             window.location.href = "/onboarding";
             return;
           }
+        }
+
+        // 2. Fetch pending invites count
+        const email = user.emailAddresses[0].emailAddress;
+        if (email) {
+          const count = await fetchPendingInvitesCount(email);
+          setPendingInvitesCount(count);
         }
 
         setWorkspaces(ws);
@@ -89,7 +98,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   if (!isMounted) return null;
 
   return (
-    <WorkspaceContext.Provider value={{ currentWorkspace, workspaces, isLoading, switchWorkspace }}>
+    <WorkspaceContext.Provider value={{ currentWorkspace, workspaces, pendingInvitesCount, isLoading, switchWorkspace }}>
       {children}
     </WorkspaceContext.Provider>
   );

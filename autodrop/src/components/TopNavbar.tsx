@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { buttonVariants } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -15,20 +16,31 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { usePathname } from "next/navigation"
-import { LayoutDashboard, Video, KanbanSquare, Settings, Play, Phone } from "lucide-react"
+import { 
+  LayoutDashboard, 
+  Video, 
+  KanbanSquare, 
+  Settings, 
+  Play, 
+  Phone, 
+  Mail 
+} from "lucide-react"
 import { SignedIn, SignedOut, UserButton, SignInButton } from '@clerk/nextjs'
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { Badge } from "@/components/ui/badge"
 
 const sidebarItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { title: "Meetings", href: "/meetings", icon: Video },
   { title: "Live Call", href: "/meetings/live", icon: Phone },
   { title: "Tasks", href: "/tasks", icon: KanbanSquare },
+  { title: "My Invites", href: "/invites", icon: Mail },
   { title: "Settings", href: "/settings", icon: Settings },
 ]
 
 export default function TopNavbar() {
   const pathname = usePathname()
+  const { pendingInvitesCount } = useWorkspace()
 
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-muted/40 px-4 lg:h-[60px] lg:px-6">
@@ -51,12 +63,19 @@ export default function TopNavbar() {
                 <Link
                   key={i}
                   href={item.href}
-                  className={`mx-[-0.65rem] flex items-center gap-4 rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground ${
+                  className={`mx-[-0.65rem] flex items-center justify-between rounded-xl px-3 py-2 text-muted-foreground hover:text-foreground ${
                     active ? "bg-muted text-foreground" : ""
                   }`}
                 >
-                  <item.icon className="h-5 w-5" />
-                  {item.title}
+                  <div className="flex items-center gap-4">
+                    <item.icon className="h-5 w-5" />
+                    {item.title}
+                  </div>
+                  {item.href === "/invites" && pendingInvitesCount > 0 && (
+                    <Badge variant="destructive" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px]">
+                      {pendingInvitesCount}
+                    </Badge>
+                  )}
                 </Link>
               )
             })}

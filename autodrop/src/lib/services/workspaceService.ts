@@ -116,6 +116,20 @@ export async function fetchPendingInvites(email: string) {
   return data ?? [];
 }
 
+export async function fetchPendingInvitesCount(email: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("invites")
+    .select("*", { count: "exact", head: true })
+    .eq("email", email.toLowerCase())
+    .eq("status", "pending");
+
+  if (error) {
+    console.error("Error fetching pending invites count:", error.message);
+    return 0;
+  }
+  return count ?? 0;
+}
+
 export async function respondToInvite(inviteId: string, status: "accepted" | "rejected", userId?: string) {
   if (status === "accepted" && !userId) {
     throw new Error("User ID is required to accept an invitation");

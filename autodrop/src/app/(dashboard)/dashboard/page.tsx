@@ -12,10 +12,12 @@ import { Meeting, Task } from "@/lib/types"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed"
+import { toast } from "sonner"
+import { Mail } from "lucide-react"
 
 export default function DashboardPage() {
   const { user } = useUser()
-  const { currentWorkspace, isLoading: isWorkspaceLoading } = useWorkspace()
+  const { currentWorkspace, pendingInvitesCount, isLoading: isWorkspaceLoading } = useWorkspace()
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [isDataLoading, setIsDataLoading] = useState(true)
@@ -47,6 +49,17 @@ export default function DashboardPage() {
     loadData()
   }, [currentWorkspace?.id])
 
+  useEffect(() => {
+    if (pendingInvitesCount > 0) {
+      toast.info(`You have ${pendingInvitesCount} pending workspace invitation(s)!`, {
+        action: {
+          label: "View Inbox",
+          onClick: () => window.location.href = "/invites"
+        },
+      })
+    }
+  }, [pendingInvitesCount])
+
   const completedTasks = useMemo(() => tasks.filter((t) => t.status === "Done").length, [tasks])
   const pendingTasks = tasks.length - completedTasks
 
@@ -68,6 +81,17 @@ export default function DashboardPage() {
           </h1>
           <p className="text-muted-foreground mt-1 text-lg">Here&apos;s a quick look at your workspace activity.</p>
         </div>
+        {pendingInvitesCount > 0 && (
+          <Link href="/invites" className="flex items-center gap-3 bg-primary/5 hover:bg-primary/10 border border-primary/20 rounded-2xl p-4 transition-all group scale-95 hover:scale-100 origin-right">
+            <div className="p-2 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors">
+              <Mail className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-primary tracking-tight">Pending Invitations</p>
+              <p className="text-[10px] text-muted-foreground font-medium">You have {pendingInvitesCount} invites waiting.</p>
+            </div>
+          </Link>
+        )}
         <div className="flex items-center gap-3">
           <div className="flex -space-x-3 overflow-hidden">
             {[1,2,3,4].map(i => (

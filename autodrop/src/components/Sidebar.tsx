@@ -3,9 +3,11 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LayoutDashboard, Video, KanbanSquare, Settings, Play, Phone } from "lucide-react"
+import { LayoutDashboard, Video, KanbanSquare, Settings, Play, Phone, Mail } from "lucide-react"
 import { WorkspaceSwitcher } from "./workspaces/WorkspaceSwitcher"
 import { TeamList } from "./team/TeamList"
+import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { Badge } from "@/components/ui/badge"
 
 const sidebarItems = [
   {
@@ -29,6 +31,11 @@ const sidebarItems = [
     icon: KanbanSquare,
   },
   {
+    title: "My Invites",
+    href: "/invites",
+    icon: Mail,
+  },
+  {
     title: "Settings",
     href: "/settings",
     icon: Settings,
@@ -37,6 +44,7 @@ const sidebarItems = [
 
 export default function Sidebar() {
   const pathname = usePathname()
+  const { pendingInvitesCount } = useWorkspace()
 
   return (
     <div className="hidden border-r bg-muted/40 md:block w-64 flex-shrink-0">
@@ -69,8 +77,15 @@ export default function Sidebar() {
                       : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
                   )}
                 >
-                  <item.icon className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
-                  {item.title}
+                  <div className="flex items-center gap-3">
+                    <item.icon className={cn("h-4 w-4", active ? "text-primary" : "text-muted-foreground")} />
+                    {item.title}
+                  </div>
+                  {item.href === "/invites" && pendingInvitesCount > 0 && (
+                    <Badge variant="destructive" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px] animate-pulse">
+                      {pendingInvitesCount}
+                    </Badge>
+                  )}
                 </Link>
               )
             })}
