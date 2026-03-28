@@ -89,8 +89,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const switchWorkspace = (workspaceId: string) => {
     const ws = workspaces.find(w => w.id === workspaceId);
     if (ws) {
-      setCurrentWorkspace(ws);
       localStorage.setItem("autodrop_last_workspace_id", workspaceId);
+      // Clean refresh to ensure all hooks and states reset with the new workspace context
+      window.location.href = "/dashboard";
     }
   };
 
