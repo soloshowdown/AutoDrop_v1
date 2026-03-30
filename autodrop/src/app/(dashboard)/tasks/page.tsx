@@ -30,48 +30,6 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 
-const MOCK_TASKS: Task[] = [
-  {
-    id: "mock-1",
-    title: "[DEMO] Update project documentation",
-    status: "To Do",
-    priority: "medium",
-    assignee: "Kunal",
-    sourceType: "AI",
-    meetingTitle: "Strategy Sync",
-    meetingId: "m1",
-    approved: true
-  },
-  {
-    id: "mock-2",
-    title: "[DEMO] Implement real-time notifications",
-    status: "In Progress",
-    priority: "high",
-    assignee: "Alice",
-    sourceType: "User",
-    approved: true
-  },
-  {
-    id: "mock-3",
-    title: "[DEMO] Fix bug in authentication flow",
-    status: "Done",
-    priority: "high",
-    assignee: "Bob",
-    sourceType: "AI",
-    meetingTitle: "Backend Triage",
-    meetingId: "m2",
-    approved: true
-  },
-  {
-    id: "mock-4",
-    title: "[DEMO] Design new landing page",
-    status: "Backlog",
-    priority: "low",
-    assignee: "Sarah",
-    sourceType: "User",
-    approved: false
-  }
-];
 
 export default function KanbanBoardPage() {
   const { currentWorkspace, isLoading: isWorkspaceLoading } = useWorkspace()
@@ -105,7 +63,7 @@ export default function KanbanBoardPage() {
         })
       }
       prevTasksCount.current = records.length
-      setTasks(records.length > 0 ? records : MOCK_TASKS)
+      setTasks(records)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load tasks")
     } finally {
@@ -170,7 +128,7 @@ export default function KanbanBoardPage() {
             // Task unapproved or was moved out of view
             const result = filtered.filter(t => t.id !== updatedTask.id);
             // If we filtered out the last real task, revert to mock if desired, or stay empty
-            if (result.length === 0) return MOCK_TASKS;
+            if (result.length === 0) return [];
             return result;
           }
         })
@@ -178,7 +136,7 @@ export default function KanbanBoardPage() {
         const deletedId = payload.old.id
         setTasks((prev) => {
           const result = prev.filter((t) => t.id !== deletedId);
-          if (result.length === 0) return MOCK_TASKS;
+          if (result.length === 0) return [];
           return result;
         })
       }

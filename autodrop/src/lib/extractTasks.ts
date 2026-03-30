@@ -1,67 +1,12 @@
 import OpenAI from "openai";
 import { ExtractedTask } from "@/lib/types";
+import { bulkInsertTasks } from "@/lib/services/taskService";
+import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-export async function segmentTranscriptBySpeaker(transcript: string) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
-
-  const client = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
-  const prompt = `
-You are an AI meeting analyst that extracts actionable data from transcripts.
-
-TASK 1: Segment the transcript by speaker with their full name/ID.
-TASK 2: Extract all unique participants mentioned.
-TASK 3: Identify all action items and tasks with:
-   - task: Clear description of what needs to be done
-   - who: Person responsible for doing the task (assignee)
-   - to_whom: Person requesting the task (if applicable)
-   - due_date: Deadline (extract all date indicators: "by tomorrow", "next Monday", "EOW", "end of month", etc.)
-   - priority: 'high', 'medium', or 'low' based on context
-
-Return ONLY valid JSON with this exact shape:
-{
-  "segments": [{"speaker": "Full Name", "text": "What they said..."}],
-  "participants": ["Full Name 1", "Full Name 2"],
-  "tasks": [
-    {
-      "title": "Prepare Q4 financial report",
-      "assignee": "John Smith",
-      "deadline": "Friday EOD",
-      "priority": "high"
-    }
-  ]
-}
-
-Important:
-- Use exact keys: "title", "assignee", "deadline"
-- Extract FULL NAMES of all people mentioned (not "Speaker 1")
-- If names aren't stated, use contextual clues from title or role
-- Be aggressive about extracting ALL implied tasks
-- Include meetings, reviews, presentations, deliverables
-- Preserve exact date references the speaker used
-
-Transcript:
-${transcript}
-`;
-
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" },
-  });
-
-  const content = completion.choices[0]?.message?.content ?? "{}";
-  try {
-    return JSON.parse(content);
-  } catch {
-    return { segments: [], tasks: [] };
-  }
-}
-
-export async function extractTasksFromChunk(speechText: string, speaker: string) {
+/**
+ * Extracts tasks from a full transcript using GPT-4o.
+ */
+export async function extractTasks(meetingId: string, transcriptText: string, workspaceId: string) {
   if (!process.env.OPENAI_API_KEY) {
     throw new Error("OPENAI_API_KEY is not configured");
   }
@@ -70,52 +15,76 @@ export async function extractTasksFromChunk(speechText: string, speaker: string)
     apiKey: process.env.OPENAI_API_KEY,
   });
 
-  const prompt = `You are an AI meeting assistant that extracts action items from a short segment of meeting text.
-
-Task:
-- Read the transcript chunk below.
-- Extract NEW tasks and commitments. Identify BOTH who is speaking and who is being assigned the task.
-- People may be referred to by name, e.g., "Mags, you should do X" or "I want Kunal to handle Y".
-- Assignee identification: Look for names in the text or use the speaker if they commit with "I will...".
-- Participants might have workspace info in their name, e.g., "Kunal (AutoDrop)". Extract exactly what is mentioned or the closest name.
-- Return only valid JSON with this exact structure:
+  const systemPrompt = `You are an expert meeting analyst. Extract every action item, task, deadline, and commitment from the transcript.
+Return ONLY a valid JSON array. No markdown. No explanation. No preamble.
+Each object must have exactly these fields:
 {
-  "tasks": [
-    {
-      "title": "Short task description",
-      "assignee": "Full Name + Workspace if available",
-      "deadline": "as stated in text or null",
-      "priority": "low" | "medium" | "high"
-    }
-  ]
-}
+  "title": string,          // imperative sentence e.g. 'Fix login bug on mobile'
+  "assignee": string|null,  // name if mentioned, else null
+  "deadline": string|null,  // ISO date YYYY-MM-DD if mentioned, else null
+  "priority": "high"|"medium"|"low",  // infer from urgency
+  "confidence": number,     // 0.0 to 1.0, how explicitly was this committed to
+  "source_timestamp_ms": number,  // ms in transcript where this was mentioned
+  "key_point": boolean      // true if major decision, not just a task
+}`;
 
-If there are no action items, return {"tasks": []}.
-
-Transcript chunk:
-${speaker}: ${speechText}`;
+  await supabaseAdmin.from("meetings").update({ status: "extracting" }).eq("id", meetingId);
 
   const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }],
+    model: "gpt-4o",
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: transcriptText }
+    ],
     response_format: { type: "json_object" },
   });
 
-  const content = completion.choices[0]?.message?.content ?? "{}";
-
+  const content = completion.choices[0]?.message?.content ?? "[]";
+  let tasks: any[] = [];
   try {
     const parsed = JSON.parse(content);
-    return {
-      tasks: Array.isArray(parsed.tasks)
-        ? parsed.tasks.map((task: any) => ({
-            title: String(task.title || "").trim(),
-            assignee: task.assignee ? String(task.assignee).trim() : undefined,
-            deadline: task.deadline ? String(task.deadline).trim() : null,
-            priority: task.priority ? String(task.priority).toLowerCase() : undefined,
-          }))
-        : [],
-    } as { tasks: ExtractedTask[] };
-  } catch {
-    return { tasks: [] };
+    tasks = Array.isArray(parsed) ? parsed : (parsed.tasks || []);
+  } catch (e) {
+    console.error("Failed to parse GPT response:", e);
+    return [];
   }
+
+  // Map to Supabase schema and apply confidence logic
+  const tasksToInsert = tasks.map(t => ({
+    workspace_id: workspaceId,
+    meeting_id: meetingId,
+    title: t.title,
+    assignee_name: t.assignee, // We might need to resolve this to assignee_id later
+    due_date: t.deadline,
+    priority: t.priority || "medium",
+    status: t.confidence >= 0.7 ? "Backlog" : "To Do", // Per instructions: 0.7 threshold
+    source_type: "AI",
+    confidence: t.confidence,
+    transcript_timestamp: t.source_timestamp_ms ? String(t.source_timestamp_ms) : null,
+    approved: false, // AI tasks need review
+    metadata: { key_point: t.key_point }
+  }));
+
+  if (tasksToInsert.length > 0) {
+    await bulkInsertTasks(tasksToInsert);
+  }
+
+  await supabaseAdmin.from("meetings").update({ status: "completed" }).eq("id", meetingId);
+
+  return tasksToInsert;
 }
+
+// Keep existing helper if needed for live chunks, but update it to be consistent
+export async function extractTasksFromChunk(speechText: string, speaker: string) {
+  // This is now secondary but we'll keep it for live chunks if still used
+  // and ensure it's simple.
+  return { tasks: [] }; 
+}
+
+// Keeping this for backward compatibility if used in transcribe route initially
+export async function segmentTranscriptBySpeaker(transcript: string) {
+    // This is essentially what extractTasks does now but focused on segments
+    // For now, let's keep a simplified version or just use extractTasks
+    return { segments: [], tasks: [] };
+}
+

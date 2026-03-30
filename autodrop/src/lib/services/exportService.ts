@@ -1,19 +1,21 @@
 import { Task } from "@/lib/types";
 
 export function exportTasksAsCSV(tasks: Task[]): string {
-  const headers = ["ID", "Title", "Status", "Due Date", "Assignee", "Meeting ID"];
+  const headers = ["Title", "Assignee", "Deadline", "Priority", "Column", "Confidence", "Meeting Name"];
   const rows = tasks.map((task) => [
-    task.id,
     `"${task.title.replace(/"/g, '""')}"`,
-    task.status,
-    task.dueDate ?? "",
     task.assignee ?? "",
-    task.meetingId ?? "",
+    task.dueDate ?? "",
+    task.priority ?? "medium",
+    task.status,
+    task.confidence ?? "",
+    `"${(task.meetingTitle || "").replace(/"/g, '""')}"`,
   ]);
 
   const csv = [headers.join(","), ...rows.map((row) => row.join(","))].join("\n");
   return csv;
 }
+
 
 export function exportTasksAsJSON(tasks: Task[]): string {
   return JSON.stringify(tasks, null, 2);

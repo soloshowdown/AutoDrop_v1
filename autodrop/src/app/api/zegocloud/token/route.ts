@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import crypto from "node:crypto";
 
 function randomInt(min: number, max: number) {
@@ -66,6 +67,9 @@ function generateToken04(
 
 export async function POST(req: Request) {
   try {
+    const { userId: clerkUserId } = await auth();
+    if (!clerkUserId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const appIdRaw = process.env.ZEGO_APP_ID;
     const serverSecret = process.env.ZEGO_SERVER_SECRET;
 

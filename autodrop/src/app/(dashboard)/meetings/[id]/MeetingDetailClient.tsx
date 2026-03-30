@@ -8,7 +8,7 @@ import { FileText, Play, ArrowLeft, Bot, Sparkles, Plus, Download, ArrowRight } 
 import Link from "next/link"
 import { toast } from "sonner"
 import { Meeting, TranscriptSnippet, Task } from "@/lib/types"
-import { downloadFile } from "@/lib/services/exportService"
+import { downloadFile, exportTasksAsCSVFile } from "@/lib/services/exportService"
 import { motion, AnimatePresence } from "framer-motion"
 
 interface MeetingDetailClientProps {
@@ -94,6 +94,15 @@ ${extractedTasks.map((task) => `- [${task.status}] ${task.title}${task.assignee 
     }
   }
 
+  const handleExportTasks = () => {
+    try {
+      exportTasksAsCSVFile(extractedTasks);
+      toast.success("Tasks exported to CSV");
+    } catch (error) {
+      toast.error("Failed to export tasks");
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6 max-w-[1600px] w-full mx-auto">
       <div className="flex items-center gap-4">
@@ -111,6 +120,14 @@ ${extractedTasks.map((task) => `- [${task.status}] ${task.title}${task.assignee 
           <p className="text-muted-foreground text-sm">{new Date(meeting.date).toLocaleDateString()} • {meeting.duration}</p>
         </div>
         <div className="ml-auto flex gap-2">
+           <Button 
+             variant="outline"
+             size="sm"
+             onClick={handleExportTasks}
+             disabled={extractedTasks.length === 0}
+           >
+             <Download className="mr-2 h-4 w-4" /> Export Tasks
+           </Button>
            <Button 
              variant="outline"
              size="sm"

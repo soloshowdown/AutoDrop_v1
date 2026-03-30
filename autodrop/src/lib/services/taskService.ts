@@ -27,13 +27,18 @@ function normalizeTask(row: any): Task {
 /*  Public API                                                         */
 /* ------------------------------------------------------------------ */
 
-export async function fetchTasks(workspaceId: string): Promise<Task[]> {
-  const { data, error } = await supabase
+export async function fetchTasks(workspaceId: string, meetingId?: string): Promise<Task[]> {
+  let query = supabase
     .from("tasks")
     .select("*, assignee:users!assignee_id(*)")
     .eq("workspace_id", workspaceId)
-    .eq("approved", true)
-    .order("created_at", { ascending: false });
+    .eq("approved", true);
+  
+  if (meetingId) {
+    query = query.eq("meeting_id", meetingId);
+  }
+
+  const { data, error } = await query.order("created_at", { ascending: false });
 
   if (error) {
     if (error.message.includes('column "approved" does not exist')) {
@@ -45,6 +50,24 @@ export async function fetchTasks(workspaceId: string): Promise<Task[]> {
 
   return (data ?? []).map((r) => normalizeTask(r));
 }
+
+/**
+ * Bulk insert tasks extracted by AI.
+ */
+export async function bulkInsertTasks(tasks: any[]): Promise<any[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .insert(tasks)
+    .select();
+
+  if (error) {
+    console.error("Error bulk inserting tasks:", error.message);
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+}
+
 
 export async function updateTaskStatus(
   taskId: string,

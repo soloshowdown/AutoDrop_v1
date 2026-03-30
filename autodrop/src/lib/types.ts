@@ -27,7 +27,10 @@ export interface Task {
   sourceType?: "AI" | "User";
   transcriptTimestamp?: string;
   approved: boolean;
+  confidence?: number;
+  assigneeName?: string;
 }
+
 
 export interface TranscriptSnippet {
   time: string;

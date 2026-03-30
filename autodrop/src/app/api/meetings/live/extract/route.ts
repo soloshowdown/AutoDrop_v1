@@ -1,125 +1,108 @@
 import { NextResponse } from "next/server";
+import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
-import { normalizeTaskTitle, resolveAssigneeIdFromName } from "@/lib/taskUtils";
-import { extractTasksFromChunk } from "@/lib/extractTasks";
+import OpenAI from "openai";
+import { extractTasks } from "@/lib/extractTasks";
+import fs from "fs";
+import path from "path";
 
 export async function POST(req: Request) {
   try {
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const body = await req.json();
-    const { meetingId, workspaceId, speaker, text, time } = body;
+    const { meetingId } = body;
 
-    if (!meetingId || !workspaceId || !text) {
-      return NextResponse.json({ error: "meetingId, workspaceId, and text are required" }, { status: 400 });
+    if (!meetingId) {
+      return NextResponse.json({ error: "meetingId is required" }, { status: 400 });
     }
 
-    // 1. Save transcript segment
-    const { data: transcriptData, error: transcriptError } = await supabaseAdmin.from("transcripts").insert({
-      meeting_id: meetingId,
-      speaker: speaker || "Speaker",
-      text: text,
-      time: time || new Date().toISOString(),
-      is_actionable: false,
-    }).select().single();
+    // 1. Fetch meeting and workspace info
+    const { data: meeting, error: meetingError } = await supabaseAdmin
+      .from("meetings")
+      .select("*")
+      .eq("id", meetingId)
+      .single();
 
-    if (transcriptError) {
-      return NextResponse.json({ error: transcriptError.message }, { status: 500 });
+    if (meetingError || !meeting) {
+      return NextResponse.json({ error: "Meeting not found" }, { status: 404 });
     }
 
-    // 2. Extract tasks from the text chunk
-    const extraction = await extractTasksFromChunk(text, speaker || "Speaker");
-    const extractedTasks = extraction.tasks ?? [];
+    // 2. Download all chunks from storage
+    const { data: chunks, error: listError } = await supabaseAdmin.storage
+      .from("meetings")
+      .list(`chunks/${meetingId}`, {
+        limit: 100,
+        sortBy: { column: 'name', order: 'asc' },
+      });
 
-    // 3. Get existing tasks for deduplication
-    const { data: existingTasks = [] } = await supabaseAdmin
-      .from("tasks")
-      .select("title")
-      .eq("meeting_id", meetingId);
+    if (listError || !chunks || chunks.length === 0) {
+      return NextResponse.json({ error: "No recorded chunks found" }, { status: 404 });
+    }
 
-    const existingTitles = (existingTasks ?? []).map((row: any) => normalizeTaskTitle(String(row.title || "")));
+    // Concatenate chunks
+    const chunkBuffers: Buffer[] = [];
+    for (const chunk of chunks) {
+      const { data: blob, error: downloadError } = await supabaseAdmin.storage
+        .from("meetings")
+        .download(`chunks/${meetingId}/${chunk.name}`);
+      
+      if (!downloadError && blob) {
+        chunkBuffers.push(Buffer.from(await blob.arrayBuffer()));
+      }
+    }
+
+    const finalBuffer = Buffer.concat(chunkBuffers);
+
+    // 3. Transcribe with Whisper
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY not set");
+    }
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     
-    // 4. Get workspace members for assignee mapping
-    const { data: workspaceMembers } = await supabaseAdmin
-      .from("workspace_members")
-      .select("*, users (*)")
-      .eq("workspace_id", workspaceId);
+    const tmpDir = process.platform === "win32" ? path.join(process.cwd(), "tmp") : "/tmp";
+    if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+    const filePath = path.join(tmpDir, `${Date.now()}-live-recording.webm`);
+    await fs.promises.writeFile(filePath, finalBuffer);
 
-    const insertedTasks: any[] = [];
-    const membersCache: Record<string, any[]> = { [workspaceId]: (workspaceMembers || []) as any[] };
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(filePath),
+      model: "whisper-1",
+      response_format: "verbose_json"
+    });
 
-    for (const item of extractedTasks) {
-      const title = String(item.title || "").trim();
-      if (!title) continue;
-      
-      const normalizedTitle = normalizeTaskTitle(title);
-      if (existingTitles.includes(normalizedTitle)) continue;
-      existingTitles.push(normalizedTitle);
+    const transcriptText = transcription.text || "";
+    const words = (transcription as any).words || [];
 
-      let targetWorkspaceId = workspaceId;
-      let assigneeName = item.assignee?.trim() || speaker;
-      
-      // Check for workspace hint in name: "Name (Workspace)"
-      const workspaceMatch = assigneeName.match(/(.+?)\s*\((.+?)\)/);
-      if (workspaceMatch) {
-        const [, actualName, workspaceName] = workspaceMatch;
-        assigneeName = actualName.trim();
-        
-        // Try to find target workspace by name
-        const { data: targetWs } = await supabaseAdmin
-          .from("workspaces")
-          .select("id")
-          .ilike("name", workspaceName.trim())
-          .limit(1)
-          .single();
-          
-        if (targetWs) {
-          targetWorkspaceId = targetWs.id;
-          
-          // Seed cache for the new workspace if not present
-          if (!membersCache[targetWorkspaceId]) {
-            const { data: targetMembers } = await supabaseAdmin
-              .from("workspace_members")
-              .select("*, users (*)")
-              .eq("workspace_id", targetWorkspaceId);
-            membersCache[targetWorkspaceId] = (targetMembers || []) as any[];
-          }
-        }
-      }
+    // 4. Save full transcript
+    await supabaseAdmin.from("transcripts").insert({
+      meeting_id: meetingId,
+      speaker: "System",
+      text: transcriptText,
+      time: "00:00",
+      words: words,
+      is_actionable: false
+    });
 
-      const assigneeId = resolveAssigneeIdFromName(assigneeName, membersCache[targetWorkspaceId]);
+    // 5. Run extraction
+    const tasks = await extractTasks(meetingId, transcriptText, meeting.workspace_id);
 
-      const { data: insertedTask, error: insertTaskError } = await supabaseAdmin
-        .from("tasks")
-        .insert({
-          workspace_id: targetWorkspaceId,
-          meeting_id: meetingId,
-          title,
-          assignee_id: assigneeId || null,
-          due_date: item.deadline || null,
-          priority: item.priority || "medium",
-          status: "Backlog",
-          source_type: "AI",
-          transcript_timestamp: time || new Date().toISOString(),
-          approved: false,
-        })
-        .select()
-        .single();
-
-      if (!insertTaskError && insertedTask) {
-        insertedTasks.push(insertedTask);
-      }
-    }
-
-    // 5. Update transcript if actionable
-    if (insertedTasks.length > 0) {
-      await supabaseAdmin.from("transcripts").update({ is_actionable: true }).eq("id", transcriptData.id);
-    }
+    // 6. Cleanup Storage
+    const chunkPaths = chunks.map(c => `chunks/${meetingId}/${c.name}`);
+    await supabaseAdmin.storage.from("meetings").remove(chunkPaths);
+    
+    // Cleanup Local
+    await fs.promises.unlink(filePath).catch(() => undefined);
 
     return NextResponse.json({
-      transcript: transcriptData,
-      tasks: insertedTasks,
+      meeting_id: meetingId,
+      task_count: tasks.length,
+      redirect_url: `/meetings/${meetingId}`
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
+
