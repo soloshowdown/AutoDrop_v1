@@ -152,10 +152,8 @@ export async function setMeetingStatus(meetingId: string, status: "processing" |
   }
 }
 
-export async function uploadAndProcessMeeting(file: File, workspaceId: string): Promise<Meeting> {
-  // 1. Create meeting with "processing" status
-  const title = file.name.replace(/\.[^/.]+$/, "");
-  const { data: initialMeeting, error: initError } = await supabase
+export async function createMeeting(workspaceId: string, title: string): Promise<Meeting> {
+  const { data, error } = await supabase
     .from("meetings")
     .insert({
       workspace_id: workspaceId,
@@ -166,109 +164,39 @@ export async function uploadAndProcessMeeting(file: File, workspaceId: string): 
     .select()
     .single();
 
-  if (initError) throw new Error(initError.message);
+  if (error) throw new Error(error.message);
 
-  // Log upload activity
   await logActivity({
     workspaceId,
-    action: "uploaded meeting",
+    action: "started processing meeting",
     target: title,
   });
 
-  try {
-    const formData = new FormData();
-    formData.append("audio", file);
-
-    const response = await fetch("/api/transcribe", {
-      method: "POST",
-      body: formData,
-    });
-
-    if (!response.ok) {
-        throw new Error("Transcription failed");
-    }
-
-    const payload = (await response.json()) as {
-      transcript?: string;
-      result?: { 
-        segments?: Array<{ speaker?: string; text?: string }>
-        tasks?: ExtractedTask[]
-      };
-    };
-
-    const segments = payload.result?.segments ?? [];
-    const extractedTasks = payload.result?.tasks ?? [];
-
-    // 2. Save transcripts
-    const transcriptSegments = segments.map((s, i) => ({
-      meeting_id: initialMeeting.id,
-      speaker: s.speaker || "Speaker",
-      text: s.text || "",
-      time: `${String(i).padStart(2, "0")}:00`,
-    }));
-
-    if (transcriptSegments.length > 0) {
-      const { error: tsError } = await supabase.from("transcripts").insert(transcriptSegments);
-      if (tsError) console.error("Error saving transcripts:", tsError);
-    }
-
-    // 3. Create tasks
-    if (extractedTasks.length > 0) {
-      await Promise.all(
-        extractedTasks
-          .filter((task) => task.title?.trim())
-          .map(async (task) => {
-            try {
-              await createTaskIfUnique({
-                workspaceId,
-                title: task.title,
-                status: "Backlog",
-                priority: task.priority ?? "medium",
-                dueDate: task.deadline ?? undefined,
-                meetingId: initialMeeting.id,
-                meetingTitle: initialMeeting.title,
-                sourceType: "AI",
-              });
-            } catch (error) {
-              console.error(`Failed to create task "${task.title}":`, error);
-            }
-          })
-      );
-
-      // Log task extraction activity
-      await logActivity({
-        workspaceId,
-        action: `generated ${extractedTasks.length} tasks`,
-        target: `from ${title}`,
-      });
-    }
-
-    // 4. Update meeting to "completed"
-    const { data: finalMeeting, error: finalError } = await supabase
-      .from("meetings")
-      .update({ status: "completed" })
-      .eq("id", initialMeeting.id)
-      .select()
-      .single();
-
-    if (finalError) throw finalError;
-
-    return {
-      ...finalMeeting,
-      date: finalMeeting.date ?? finalMeeting.created_at,
-      transcript: toTranscriptSegments(segments),
-    };
-
-  } catch (error: any) {
-    // 5. Update meeting to "failed" on error
-    await supabase
-      .from("meetings")
-      .update({ status: "failed" })
-      .eq("id", initialMeeting.id);
-      
-    throw error;
-  }
+  return {
+    ...data,
+    date: data.date ?? data.created_at,
+  };
 }
+
+export async function uploadAndProcessMeeting(file: File, workspaceId: string, meetingId: string): Promise<void> {
+  const formData = new FormData();
+  formData.append("audio", file);
+  formData.append("meetingId", meetingId);
+
+  const response = await fetch("/api/transcribe", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: "Transcription failed" }));
+    throw new Error(errorData.error || "Transcription failed");
+  }
+
+  // Activity logging for task extraction is now harder since it's server-side, 
+  // but we logged the start above.
+}
+
 
 export function subscribeToMeetings(workspaceId: string, onEvent: (payload: any) => void) {
   return supabase

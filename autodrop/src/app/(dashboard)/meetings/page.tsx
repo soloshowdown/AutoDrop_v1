@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { UploadCloud, File, Video, ArrowRight, Phone } from "lucide-react"
 import Link from "next/link"
 import { Badge } from "@/components/ui/badge"
-import { listMeetings, uploadAndProcessMeeting } from "@/lib/services/meetingService"
+import { listMeetings, uploadAndProcessMeeting, createMeeting } from "@/lib/services/meetingService"
 import { Meeting } from "@/lib/types"
 import { toast } from "sonner"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
@@ -76,19 +76,24 @@ export default function MeetingsPage() {
   }
 
   const handleUpload = async () => {
-    if (!file) return
+    if (!file || !currentWorkspace?.id) return
     try {
       setIsUploading(true)
-      // Show overlay as soon as upload/process starts
+      const title = file.name.replace(/\.[^/.]+$/, "");
+      
+      // 1. Create meeting record first to get ID
+      const meeting = await createMeeting(currentWorkspace.id, title)
+      setProcessingResult(meeting)
+      
+      // 2. Show overlay
       setShowAIOverlay(true)
       
-      const result = await uploadAndProcessMeeting(file, currentWorkspace!.id)
-      setProcessingResult(result)
+      // 3. Start processing (upload & transcribe)
+      await uploadAndProcessMeeting(file, currentWorkspace.id, meeting.id)
       
-      const updated = await listMeetings(currentWorkspace!.id)
+      const updated = await listMeetings(currentWorkspace.id)
       setMeetings(updated)
       setFile(null)
-      // We don't toast success here anymore, the overlay handles the "completion" feel
     } catch (error) {
       setShowAIOverlay(false) // Hide overlay on error
       toast.error(error instanceof Error ? error.message : "Upload failed")
@@ -107,8 +112,7 @@ export default function MeetingsPage() {
     <div className="flex flex-col gap-8">
       <AIProcessingOverlay 
         isOpen={showAIOverlay} 
-        file={file} 
-        result={processingResult} 
+        meetingId={processingResult?.id || null} 
         onComplete={handleProcessingComplete} 
       />
       <div className="flex justify-between items-center">
