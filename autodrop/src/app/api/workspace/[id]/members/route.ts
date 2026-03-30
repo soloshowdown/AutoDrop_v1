@@ -57,10 +57,10 @@ export async function GET(
     // Format the response to include both members and invites
     const combined = [
       ...(members || []).map((m: any) => ({
-        id: m.user.id,
-        name: m.user.name,
-        email: m.user.email,
-        avatar: m.user.avatar_url,
+        id: m.user?.id || m.id, // Use workspace member ID as fallback
+        name: m.user?.name || 'Incomplete User Sync',
+        email: m.user?.email || 'Sync Pending...',
+        avatar: m.user?.avatar_url,
         role: m.role,
         status: 'active'
       })),

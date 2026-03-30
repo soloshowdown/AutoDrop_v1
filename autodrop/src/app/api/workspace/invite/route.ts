@@ -43,9 +43,10 @@ export async function POST(req: Request) {
     const { data: targetUser } = await supabase
       .from('users')
       .select('id')
-      .eq('email', targetEmail)
+      .ilike('email', targetEmail) // Case-insensitive match for the users table
       .maybeSingle()
 
+    let isActiveMember = false
     if (targetUser) {
       const { data: existingMember } = await supabase
         .from('workspace_members')
@@ -55,11 +56,12 @@ export async function POST(req: Request) {
         .maybeSingle()
 
       if (existingMember) {
+        isActiveMember = true
         return NextResponse.json({ error: 'User is already a member of this workspace' }, { status: 400 })
       }
     }
 
-    // 4. Check for existing invitation
+    // 4. Check for existing invitation record
     const { data: existingInvite, error: existingInviteError } = await supabase
       .from('invites')
       .select('id, status, role')
@@ -70,12 +72,9 @@ export async function POST(req: Request) {
     if (existingInviteError) throw existingInviteError
 
     if (existingInvite) {
-      if (existingInvite.status === 'accepted') {
-        return NextResponse.json({ error: 'User is already a member of this workspace' }, { status: 400 })
-      }
-      
-      if (existingInvite.status === 'rejected' || existingInvite.role !== role) {
-        // Reset rejected invite or update role
+      // If the invitation was 'accepted' but they AREN'T an active member (checked above), 
+      // we allow resetting it to pending so they can try joining again.
+      if (existingInvite.status === 'accepted' && !isActiveMember) {
         const { error: resetError } = await supabase
           .from('invites')
           .update({ 
@@ -86,10 +85,24 @@ export async function POST(req: Request) {
           .eq('id', existingInvite.id)
         
         if (resetError) throw resetError
+      } else if (existingInvite.status === 'accepted' && isActiveMember) {
+        return NextResponse.json({ error: 'User is already a member of this workspace' }, { status: 400 })
+      } else if (existingInvite.status === 'rejected' || existingInvite.role !== role) {
+        // Reset rejected invite or update role
+        const { error: updateError } = await supabase
+          .from('invites')
+          .update({ 
+            status: 'pending', 
+            role: role, 
+            invited_by: requesterId 
+          })
+          .eq('id', existingInvite.id)
+        
+        if (updateError) throw updateError
       }
       // If it's already pending with same role, we just proceed to re-send the email
     } else {
-      // 3. Create a new entry in the 'invites' table
+      // 5. Create a new entry in the 'invites' table
       const { error: inviteError } = await supabase
         .from('invites')
         .insert({
