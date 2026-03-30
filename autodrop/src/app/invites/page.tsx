@@ -22,16 +22,19 @@ export default function InvitesPage() {
 
     async function loadInvites() {
       try {
-        const email = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress;
-        if (!email) return;
-        const data = await fetchPendingInvites(email.toLowerCase());
+        const rawEmail = user?.primaryEmailAddress?.emailAddress || user?.emailAddresses?.[0]?.emailAddress;
+        if (!rawEmail) return;
+        const email = rawEmail.trim().toLowerCase();
+        const data = await fetchPendingInvites(email);
         setInvites(data);
       } catch (error) {
         console.error("Error loading invites:", error);
+        toast.error("Failed to load invitations. Please refresh.");
       } finally {
         setIsLoading(false);
       }
     }
+
 
     loadInvites();
   }, [user]);

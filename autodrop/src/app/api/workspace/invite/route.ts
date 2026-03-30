@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Workspace ID and Email are required' }, { status: 400 })
     }
 
-    const targetEmail = email.toLowerCase()
+    const targetEmail = email.trim().toLowerCase()
 
     // 1. Check if requester is an admin of the workspace
     const { data: member, error: memberError } = await supabase
