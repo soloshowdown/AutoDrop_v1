@@ -30,8 +30,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Only admins can invite members' }, { status: 403 })
     }
 
-    // 2. Just create an entry in the 'invites' table. 
-    // We don't directly join even if the user exists, per the new flow.
+    // 2. Fetch workspace details for the email
     const { data: workspace, error: wsFetchError } = await supabase
       .from('workspaces')
       .select('name')
@@ -40,21 +39,68 @@ export async function POST(req: Request) {
 
     if (wsFetchError) throw wsFetchError
 
-    const { error: inviteError } = await supabase
-      .from('invites')
-      .insert({
-        workspace_id: workspaceId,
-        email: targetEmail,
-        role: role,
-        invited_by: requesterId,
-        status: 'pending'
-      })
+    // 3. Check if user is already a direct member of the workspace
+    const { data: targetUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', targetEmail)
+      .maybeSingle()
 
-    if (inviteError) {
-      if (inviteError.code === '23505') {
-        return NextResponse.json({ error: 'An invitation is already pending for this email in this workspace' }, { status: 400 })
+    if (targetUser) {
+      const { data: existingMember } = await supabase
+        .from('workspace_members')
+        .select('role')
+        .eq('workspace_id', workspaceId)
+        .eq('user_id', targetUser.id)
+        .maybeSingle()
+
+      if (existingMember) {
+        return NextResponse.json({ error: 'User is already a member of this workspace' }, { status: 400 })
       }
-      throw inviteError
+    }
+
+    // 4. Check for existing invitation
+    const { data: existingInvite, error: existingInviteError } = await supabase
+      .from('invites')
+      .select('id, status, role')
+      .eq('workspace_id', workspaceId)
+      .eq('email', targetEmail)
+      .maybeSingle()
+
+    if (existingInviteError) throw existingInviteError
+
+    if (existingInvite) {
+      if (existingInvite.status === 'accepted') {
+        return NextResponse.json({ error: 'User is already a member of this workspace' }, { status: 400 })
+      }
+      
+      if (existingInvite.status === 'rejected' || existingInvite.role !== role) {
+        // Reset rejected invite or update role
+        const { error: resetError } = await supabase
+          .from('invites')
+          .update({ 
+            status: 'pending', 
+            role: role, 
+            invited_by: requesterId 
+          })
+          .eq('id', existingInvite.id)
+        
+        if (resetError) throw resetError
+      }
+      // If it's already pending with same role, we just proceed to re-send the email
+    } else {
+      // 3. Create a new entry in the 'invites' table
+      const { error: inviteError } = await supabase
+        .from('invites')
+        .insert({
+          workspace_id: workspaceId,
+          email: targetEmail,
+          role: role,
+          invited_by: requesterId,
+          status: 'pending'
+        })
+
+      if (inviteError) throw inviteError
     }
 
     // 3. Send the invitation email via Resend (Best Effort)
