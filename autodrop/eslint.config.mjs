@@ -1,13 +1,34 @@
-export default [
-  {
-    ignores: [".next/**", "out/**", "build/**", "next-env.d.ts", "node_modules/**"],
-  },
-  {
-    files: ["**/*.ts", "**/*.tsx"],
+import { FlatCompat } from "@eslint/eslintrc";
+
+const compat = new FlatCompat({
+  baseDirectory: import.meta.dirname,
+});
+
+const eslintConfig = [
+  ...compat.config({
+    extends: ["next/core-web-vitals", "next/typescript"],
+    parser: "@typescript-eslint/parser",
+    parserOptions: {
+      ecmaVersion: "latest",
+      sourceType: "module",
+    },
     rules: {
-      "no-unused-vars": "off",
+      "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unused-vars": "off",
-      "@typescript-eslint/no-explicit-any": "off"
-    }
-  }
+      "no-unused-vars": "off",
+    },
+  }),
+  {
+    ignores: [
+      ".next/**",
+      "out/**",
+      "build/**",
+      "next-env.d.ts",
+      "node_modules/**",
+    ],
+  },
 ];
+
+export default eslintConfig;
+
+
