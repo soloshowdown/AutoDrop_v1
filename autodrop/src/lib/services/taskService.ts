@@ -14,14 +14,17 @@ function normalizeTask(row: any): Task {
     priority: (row.priority as any) ?? "medium",
     dueDate: row.due_date ? String(row.due_date) : undefined,
     assigneeId: row.assignee_id ? String(row.assignee_id) : undefined,
-    assignee: typeof row.assignee === 'object' ? row.assignee?.name : undefined,
+    assignee: typeof row.assignee === 'object' ? row.assignee?.name : (row.assignee_name || undefined),
+    assigneeName: row.assignee_name || (typeof row.assignee === 'object' ? row.assignee?.name : undefined),
     sourceType: (row.source_type as any) ?? "User",
     meetingId: row.meeting_id ? String(row.meeting_id) : undefined,
     meetingTitle: row.meeting_title ? String(row.meeting_title) : undefined,
     transcriptTimestamp: row.transcript_timestamp ? String(row.transcript_timestamp) : undefined,
     approved: !!row.approved,
+    confidence: row.confidence ? Number(row.confidence) : undefined,
   };
 }
+
 
 /* ------------------------------------------------------------------ */
 /*  Public API                                                         */

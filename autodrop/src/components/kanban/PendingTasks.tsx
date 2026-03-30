@@ -108,12 +108,23 @@ export function PendingTasks({ workspaceId, onTaskApproved, onEditTask }: Pendin
                 {task.title}
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-5 pt-0">
-               <div className="flex items-center gap-2 mt-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">AI Extraction</span>
-               </div>
-            </CardContent>
+             <CardContent className="p-5 pt-0">
+                <div className="flex items-center justify-between mb-2">
+                   <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">AI Extraction</span>
+                   </div>
+                   {task.assignee && (
+                     <div className="flex items-center gap-1.5 bg-muted/30 px-2 py-0.5 rounded-full border border-white/5">
+                        <div className="w-3.5 h-3.5 rounded-full bg-primary/20 flex items-center justify-center text-[7px] font-bold text-primary border border-primary/10">
+                          {task.assignee[0]}
+                        </div>
+                        <span className="text-[9px] text-muted-foreground font-bold">{task.assignee}</span>
+                     </div>
+                   )}
+                </div>
+             </CardContent>
+
             <CardFooter className="p-4 pt-0 flex gap-2">
               <Button 
                 variant="ghost" 

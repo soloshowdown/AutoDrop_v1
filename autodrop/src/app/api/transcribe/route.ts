@@ -28,6 +28,15 @@ export async function POST(req: Request) {
 
     // 1. Upload to Supabase Storage - bucket "meetings"
     const buffer = Buffer.from(await file.arrayBuffer());
+    
+    // 1. Check file size against OpenAI Whisper limits (25MB)
+    if (buffer.length > MAX_WHISPER_SIZE) {
+      await supabaseAdmin.from("meetings").update({ status: "failed" }).eq("id", meetingId);
+      return NextResponse.json({ 
+        error: `File is too large (${(buffer.length / (1024 * 1024)).toFixed(1)}MB). OpenAI Whisper has a 25MB limit. Please upload a shorter recording.` 
+      }, { status: 400 });
+    }
+
     const storagePath = `recordings/${meetingId}/${file.name}`;
     
     const { error: uploadError } = await supabaseAdmin.storage
@@ -39,6 +48,7 @@ export async function POST(req: Request) {
 
     if (uploadError) {
       console.error("Storage upload error:", uploadError.message);
+      await supabaseAdmin.from("meetings").update({ status: "failed" }).eq("id", meetingId);
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
     }
 
@@ -101,6 +111,15 @@ export async function POST(req: Request) {
 
   } catch (error) {
     const message = error instanceof Error ? error.message : "Internal Server Error";
+    console.error("Transcribe route error:", message);
+    
+    // Attempt to mark meeting as failed if we have the ID
+    const formData = await req.formData().catch(() => null);
+    const meetingId = formData?.get("meetingId") as string | null;
+    if (meetingId) {
+      await supabaseAdmin.from("meetings").update({ status: "failed" }).eq("id", meetingId);
+    }
+
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }
