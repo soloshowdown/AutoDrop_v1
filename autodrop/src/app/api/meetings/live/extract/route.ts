@@ -75,12 +75,30 @@ export async function POST(req: Request) {
     const transcriptText = transcription.text || "";
 
     // 4. Save transcript
-    await supabaseAdmin.from("transcripts").insert({
+    const transcriptPayload: Record<string, any> = {
       meeting_id: meetingId,
       speaker: "System",
       text: transcriptText,
-      words: (transcription as any).words || []
-    });
+    };
+
+    const extractedWords = (transcription as any).words || [];
+    if (extractedWords.length > 0) {
+      transcriptPayload.words = extractedWords;
+    }
+
+    const { error: transcriptError } = await supabaseAdmin.from("transcripts").insert(transcriptPayload);
+    if (transcriptError) {
+      if (transcriptError.message.includes("words")) {
+        console.warn("Transcript table does not support the words column; saving transcript without words.");
+        await supabaseAdmin.from("transcripts").insert({
+          meeting_id: meetingId,
+          speaker: "System",
+          text: transcriptText,
+        });
+      } else {
+        return NextResponse.json({ error: transcriptError.message }, { status: 500 });
+      }
+    }
 
     // 5. Run AI extraction
     const taskCount = await extractTasks(meetingId, transcriptText, workspaceId);

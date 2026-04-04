@@ -99,10 +99,10 @@ export default function TopNavbar() {
           <UserButton />
         </SignedIn>
         <SignedOut>
-          <SignInButton>
-            <button className={buttonVariants({ variant: "secondary", size: "sm" })}>
+          <SignInButton mode="modal">
+            <div className={buttonVariants({ variant: "secondary", size: "sm" })}>
               Sign in
-            </button>
+            </div>
           </SignInButton>
         </SignedOut>
       </div>

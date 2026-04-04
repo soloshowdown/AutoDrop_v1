@@ -77,12 +77,11 @@ Each task object must have exactly these fields:
         assignee_id: assigneeId,
         due_date: task.deadline || null,
         priority: task.priority || "medium",
-        status: task.confidence >= 0.7 ? "Backlog" : "Review", 
+        status: task.confidence >= 0.7 ? "Backlog" : "Review",
         source_type: "AI",
         confidence: task.confidence || 0.5,
         transcript_timestamp: task.source_timestamp_ms ? String(task.source_timestamp_ms) : null,
         approved: false, // AI tasks always start unapproved
-        position: i
       });
     }
 

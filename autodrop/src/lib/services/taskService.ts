@@ -183,7 +183,7 @@ export async function getTasksByMeeting(meetingId: string): Promise<Task[]> {
     .from("tasks")
     .select("*, assignee:users!assignee_id(*)")
     .eq("meeting_id", meetingId)
-    .order("position", { ascending: true });
+    .order("created_at", { ascending: true });
 
   if (error) {
     console.error("Error fetching meeting tasks:", error.message);

@@ -80,14 +80,32 @@ export async function POST(req: Request) {
     const words = (transcription as any).words || [];
 
     // 4. Save transcript
-    const { error: tsError } = await supabaseAdmin.from("transcripts").insert({
+    const transcriptRecord: Record<string, any> = {
       meeting_id: meetingId,
       speaker: "System",
       text: transcriptText,
-      words: words
-    });
+    };
 
-    if (tsError) console.error("Error saving transcript:", tsError.message);
+    if (words && words.length > 0) {
+      transcriptRecord.words = words;
+    }
+
+    const { error: tsError } = await supabaseAdmin
+      .from("transcripts")
+      .insert(transcriptRecord);
+
+    if (tsError) {
+      if (tsError.message.includes("words")) {
+        console.warn("Transcript table does not support the words column; saving without words.");
+        await supabaseAdmin.from("transcripts").insert({
+          meeting_id: meetingId,
+          speaker: "System",
+          text: transcriptText,
+        });
+      } else {
+        console.error("Error saving transcript:", tsError.message);
+      }
+    }
 
     // 5. Update status to transcribed (intermediate)
     const { data: meeting } = await supabaseAdmin
