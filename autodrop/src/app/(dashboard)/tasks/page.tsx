@@ -49,6 +49,15 @@ export default function KanbanBoardPage() {
   const [editTranscriptTimestamp, setEditTranscriptTimestamp] = useState("")
   const prevTasksCount = useRef(0)
 
+  // ---- Add Task dialog state ----
+  const [showAddTaskDialog, setShowAddTaskDialog] = useState(false)
+  const [newTaskTitle, setNewTaskTitle] = useState("")
+  const [newTaskStatus, setNewTaskStatus] = useState<Task["status"]>("To Do")
+  const [newTaskPriority, setNewTaskPriority] = useState<TaskPriority>("medium")
+  const [newTaskDueDate, setNewTaskDueDate] = useState("")
+  const [newTaskAssigneeId, setNewTaskAssigneeId] = useState("")
+  const [isAddingTask, setIsAddingTask] = useState(false)
+
   const isAdmin = currentWorkspace?.role === 'admin';
 
   const loadTasks = async () => {
@@ -197,7 +206,7 @@ export default function KanbanBoardPage() {
                <Download className="h-4 w-4 mr-2" /> JSON
              </Button>
            </div>
-           <Button size="sm">
+           <Button size="sm" onClick={() => setShowAddTaskDialog(true)}>
              <Plus className="h-4 w-4 mr-2" /> Add Task
            </Button>
         </div>
@@ -360,6 +369,171 @@ export default function KanbanBoardPage() {
               Cancel
             </Button>
             <Button onClick={handleSaveEdit}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Task Dialog */}
+      <Dialog open={showAddTaskDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowAddTaskDialog(false)
+          setNewTaskTitle("")
+          setNewTaskStatus("To Do")
+          setNewTaskPriority("medium")
+          setNewTaskDueDate("")
+          setNewTaskAssigneeId("")
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Plus className="h-5 w-5 text-primary" />
+              Add New Task
+            </DialogTitle>
+            <DialogDescription>Create a new task and add it directly to the Kanban board.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="new-task-title">Title <span className="text-destructive">*</span></Label>
+              <Input
+                id="new-task-title"
+                value={newTaskTitle}
+                onChange={(e) => setNewTaskTitle(e.target.value)}
+                placeholder="What needs to be done?"
+                autoFocus
+                onKeyDown={(e) => e.key === "Enter" && !isAddingTask && newTaskTitle.trim() && (async () => {
+                  e.preventDefault()
+                  if (!newTaskTitle.trim() || !currentWorkspace?.id || !user?.id) return
+                  setIsAddingTask(true)
+                  try {
+                    await createTask({
+                      workspaceId: currentWorkspace.id,
+                      title: newTaskTitle.trim(),
+                      status: newTaskStatus,
+                      priority: newTaskPriority,
+                      dueDate: newTaskDueDate || undefined,
+                      assigneeId: newTaskAssigneeId || undefined,
+                      sourceType: "User",
+                      created_by: user.id,
+                      approved: true,
+                    })
+                    toast.success("Task created successfully")
+                    setShowAddTaskDialog(false)
+                    setNewTaskTitle("")
+                    setNewTaskStatus("To Do")
+                    setNewTaskPriority("medium")
+                    setNewTaskDueDate("")
+                    setNewTaskAssigneeId("")
+                    await loadTasks()
+                  } catch (error) {
+                    toast.error(error instanceof Error ? error.message : "Failed to create task")
+                  } finally {
+                    setIsAddingTask(false)
+                  }
+                })()}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Status</Label>
+                <Select value={newTaskStatus} onValueChange={(v) => setNewTaskStatus(v as Task["status"])}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Backlog">Backlog</SelectItem>
+                    <SelectItem value="To Do">To Do</SelectItem>
+                    <SelectItem value="In Progress">In Progress</SelectItem>
+                    <SelectItem value="Done">Done</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Priority</Label>
+                <Select value={newTaskPriority} onValueChange={(v) => setNewTaskPriority(v as TaskPriority)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Low</SelectItem>
+                    <SelectItem value="medium">Medium</SelectItem>
+                    <SelectItem value="high">High</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Assign To</Label>
+                <Select value={newTaskAssigneeId} onValueChange={(v) => setNewTaskAssigneeId(v || "")}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Unassigned</SelectItem>
+                    {teamMembers.map((member) => (
+                      <SelectItem key={member.id} value={member.id}>
+                        {member.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Due Date</Label>
+                <Input
+                  type="date"
+                  value={newTaskDueDate}
+                  onChange={(e) => setNewTaskDueDate(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowAddTaskDialog(false)} disabled={isAddingTask}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={async () => {
+                if (!newTaskTitle.trim() || !currentWorkspace?.id || !user?.id) {
+                  toast.error("Task title is required")
+                  return
+                }
+                setIsAddingTask(true)
+                try {
+                  await createTask({
+                    workspaceId: currentWorkspace.id,
+                    title: newTaskTitle.trim(),
+                    status: newTaskStatus,
+                    priority: newTaskPriority,
+                    dueDate: newTaskDueDate || undefined,
+                    assigneeId: newTaskAssigneeId || undefined,
+                    sourceType: "User",
+                    created_by: user.id,
+                    approved: true,
+                  })
+                  toast.success("Task created successfully")
+                  setShowAddTaskDialog(false)
+                  setNewTaskTitle("")
+                  setNewTaskStatus("To Do")
+                  setNewTaskPriority("medium")
+                  setNewTaskDueDate("")
+                  setNewTaskAssigneeId("")
+                  await loadTasks()
+                } catch (error) {
+                  toast.error(error instanceof Error ? error.message : "Failed to create task")
+                } finally {
+                  setIsAddingTask(false)
+                }
+              }}
+              disabled={isAddingTask || !newTaskTitle.trim()}
+            >
+              {isAddingTask ? (
+                <span className="flex items-center gap-2"><Sparkles className="h-4 w-4 animate-pulse" /> Creating...</span>
+              ) : (
+                <span className="flex items-center gap-2"><Plus className="h-4 w-4" /> Create Task</span>
+              )}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

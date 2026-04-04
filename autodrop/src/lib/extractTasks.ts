@@ -94,14 +94,14 @@ OUTPUT FORMAT (STRICT JSON):
     for (const t of tasks) {
       let assigneeId = null;
       if (t.assignee_name && t.assignee_name !== "null") {
-        const { data: user } = await supabaseAdmin
+        const { data: users } = await supabaseAdmin
           .from("users")
           .select("id")
           .ilike("name", `%${t.assignee_name}%`)
-          .single();
+          .limit(1);
           
-        if (user) {
-          assigneeId = user.id;
+        if (users && users.length > 0) {
+          assigneeId = users[0].id;
         }
       }
 

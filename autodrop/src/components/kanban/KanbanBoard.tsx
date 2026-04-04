@@ -267,8 +267,22 @@ export function KanbanBoard({
             onChange={(event) => setDraftTitle(event.target.value)}
             placeholder="Quick add task title"
             className="w-56 h-9"
+            onKeyDown={async (e) => {
+              if (e.key === "Enter" && draftTitle.trim()) {
+                await onAddTask?.(draftTitle.trim(), "To Do");
+                setDraftTitle("");
+              }
+            }}
           />
-          <Button size="sm" onClick={() => onAddTask?.(draftTitle, "To Do")}>
+          <Button 
+            size="sm" 
+            disabled={!draftTitle.trim()}
+            onClick={async () => {
+              if (!draftTitle.trim()) return;
+              await onAddTask?.(draftTitle.trim(), "To Do");
+              setDraftTitle("");
+            }}
+          >
             <Plus className="h-4 w-4 mr-1" />
             Add
           </Button>

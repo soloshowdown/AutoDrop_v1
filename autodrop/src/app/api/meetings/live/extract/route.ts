@@ -3,6 +3,8 @@ import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 import { extractTasks } from "@/lib/extractTasks";
 
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   try {
     const { userId } = await auth();

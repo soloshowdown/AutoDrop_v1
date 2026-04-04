@@ -8,7 +8,10 @@ import { extractTasks } from "@/lib/extractTasks";
 
 const MAX_WHISPER_SIZE = 25 * 1024 * 1024; // 25MB
 
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
+  let fallbackMeetingId: string | null = null;
   try {
     const { userId } = await auth();
     if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -21,6 +24,7 @@ export async function POST(req: Request) {
     const formData = await req.formData();
     const file = formData.get("audio") as File | null;
     const meetingId = formData.get("meetingId") as string | null;
+    fallbackMeetingId = meetingId;
 
     if (!file || !meetingId) {
       return NextResponse.json({ error: "File and meetingId are required" }, { status: 400 });
@@ -112,10 +116,8 @@ export async function POST(req: Request) {
     console.error("Transcribe route error:", message);
     
     // Attempt to mark meeting as failed if we have the ID
-    const formData = await req.formData().catch(() => null);
-    const meetingId = formData?.get("meetingId") as string | null;
-    if (meetingId) {
-      await supabaseAdmin.from("meetings").update({ status: "failed" }).eq("id", meetingId);
+    if (fallbackMeetingId) {
+      await supabaseAdmin.from("meetings").update({ status: "failed" }).eq("id", fallbackMeetingId);
     }
 
     return NextResponse.json({ error: message }, { status: 500 });

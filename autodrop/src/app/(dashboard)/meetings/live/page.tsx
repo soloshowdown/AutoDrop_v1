@@ -196,18 +196,24 @@ export default function LiveMeetingPage() {
     }
   }, [handleJoin]);
 
+  // Immediately append a final speech segment to the local transcript display.
+  // This is always called and never gated on liveMeetingId.
+  const appendToTranscript = (text: string) => {
+    if (!text.trim()) return;
+    const timestamp = new Date().toISOString();
+    setLiveTranscript((prev) => [
+      ...prev,
+      { speaker: userName.trim() || "Speaker", text, time: timestamp },
+    ]);
+  };
+
+  // Throttled API chunk processor — only fires every 15s if meeting context is ready.
   const processTextChunk = async (text: string) => {
     if (!currentWorkspace?.id || !liveMeetingId || !text.trim()) {
+      // Meeting context not ready, but transcript display is already handled by appendToTranscript
       return;
     }
-
-    const timestamp = new Date().toISOString();
-    
-    // Accrue local transcript
-    setLiveTranscript((prev) => [
-      ...prev, 
-      { speaker: userName.trim() || "Speaker", text, time: timestamp }
-    ]);
+    // Could be used to send chunk to backend for early extraction if desired
   };
 
   const handleStartRecording = () => {
@@ -231,23 +237,19 @@ export default function LiveMeetingPage() {
       let interim = "";
       for (let i = event.resultIndex; i < event.results.length; ++i) {
         if (event.results[i].isFinal) {
-          const finalPart = event.results[i][0].transcript;
-          transcriptBufferRef.current += " " + finalPart;
+          const finalPart = event.results[i][0].transcript.trim();
+          if (finalPart) {
+            // 1. Immediately show in the UI — always works, no meeting ID needed
+            appendToTranscript(finalPart);
+            // 2. Accrue in buffer for the full-transcript extraction at end of meeting
+            transcriptBufferRef.current += " " + finalPart;
+          }
           setInterimTranscript("");
         } else {
           interim += event.results[i][0].transcript;
         }
       }
       setInterimTranscript(interim);
-
-      // Throttle: Send buffer every 15 seconds or if it gets too long
-      const now = Date.now();
-      if (now - lastProcessedTimeRef.current > 15000 && transcriptBufferRef.current.trim().length > 20) {
-        const textToProcess = transcriptBufferRef.current.trim();
-        transcriptBufferRef.current = "";
-        lastProcessedTimeRef.current = now;
-        void processTextChunk(textToProcess);
-      }
     };
 
     recognition.onerror = (event: any) => {
