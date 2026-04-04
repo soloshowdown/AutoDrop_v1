@@ -10,7 +10,7 @@ export interface Meeting {
   participants?: string[];
 }
 
-export type TaskStatus = "Backlog" | "To Do" | "In Progress" | "Done";
+export type TaskStatus = "Review" | "Backlog" | "To Do" | "In Progress" | "Done";
 export type TaskPriority = "low" | "medium" | "high";
 
 export interface Task {

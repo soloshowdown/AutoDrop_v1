@@ -29,6 +29,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 
 const columns: { id: TaskStatus; title: string }[] = [
+  { id: "Review", title: "Review" },
   { id: "Backlog", title: "Backlog" },
   { id: "To Do", title: "To Do" },
   { id: "In Progress", title: "In Progress" },

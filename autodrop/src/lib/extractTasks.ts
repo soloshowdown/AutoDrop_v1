@@ -1,21 +1,9 @@
 import OpenAI from "openai";
-import { ExtractedTask } from "@/lib/types";
-import { bulkInsertTasks } from "@/lib/services/taskService";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-async function getTeamMembers(workspaceId: string) {
-  const { data, error } = await supabaseAdmin
-    .from("workspace_members")
-    .select("user_id, users!inner(name)")
-    .eq("workspace_id", workspaceId);
-    
-  if (error || !data) return ["Kunal", "Vaibhav", "Rahul", "Sumit"];
-  const names = data.map((d: any) => d.users?.name).filter(Boolean);
-  return names.length > 0 ? names : ["Kunal", "Vaibhav", "Rahul", "Sumit"];
-}
-
 /**
- * Extracts tasks from a full transcript using GPT-4o.
+ * Extracts tasks from a full transcript using GPT-4o-mini.
+ * Follows the strict requirement for field mapping and column (status) logic.
  */
 export async function extractTasks(meetingId: string, transcriptText: string, workspaceId: string) {
   try {
@@ -23,55 +11,28 @@ export async function extractTasks(meetingId: string, transcriptText: string, wo
       throw new Error("OPENAI_API_KEY is not configured");
     }
 
-    const client = new OpenAI({
+    const openai = new OpenAI({
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const teamMembersList = await getTeamMembers(workspaceId);
-
-    const systemPrompt = `You are an AI assistant that extracts tasks from a team meeting transcript.
-
-Each line is in format:
-"Speaker: message"
-
----
-
-GOAL:
-Extract tasks and assign them to the correct team member.
-
----
-
-RULES:
-
-1. If speaker says "I will..." → assign task to speaker
-2. If speaker mentions a person (e.g., "Vaibhav, do this") → assign to that person
-3. If someone agrees ("I'll do it") → assign to that speaker
-4. If no clear assignee → assignee = null
-5. Only assign tasks to valid team members
-
----
-
-TEAM MEMBERS:
-${JSON.stringify(teamMembersList)}
-
----
-
-OUTPUT FORMAT (STRICT JSON):
-
-{
-  "tasks": [
-    {
-      "title": "task title",
-      "assignee_name": "exact team member name or null",
-      "assigned_by": "speaker"
-    }
-  ]
-}`;
+    const systemPrompt = `You are an expert meeting analyst.
+Extract every action item, task, deadline, and commitment from the transcript.
+Return ONLY a valid JSON object with a single key "tasks" containing an array.
+Each task object must have exactly these fields:
+ {
+  "title": string,           // clear imperative sentence
+  "assignee": string|null,   // person's name if mentioned, else null
+  "deadline": string|null,   // ISO date YYYY-MM-DD if mentioned, else null
+  "priority": "high"|"medium"|"low",
+  "confidence": number,      // 0.0 to 1.0
+  "source_timestamp_ms": number,
+  "key_point": boolean
+ }`;
 
     await supabaseAdmin.from("meetings").update({ status: "extracting" }).eq("id", meetingId);
 
-    const completion = await client.chat.completions.create({
-      model: "gpt-4o",
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: "TRANSCRIPT:\n" + transcriptText }
@@ -80,10 +41,10 @@ OUTPUT FORMAT (STRICT JSON):
     });
 
     const content = completion.choices[0]?.message?.content ?? "{\"tasks\": []}";
-    let tasks: any[] = [];
+    let extractedTasks: any[] = [];
     try {
       const parsed = JSON.parse(content);
-      tasks = parsed.tasks || (Array.isArray(parsed) ? parsed : []);
+      extractedTasks = parsed.tasks || [];
     } catch (e) {
       console.error("Failed to parse GPT response:", e);
       throw new Error("AI output parsing failed");
@@ -91,13 +52,16 @@ OUTPUT FORMAT (STRICT JSON):
 
     const tasksToInsert = [];
     
-    for (const t of tasks) {
+    for (let i = 0; i < extractedTasks.length; i++) {
+      const task = extractedTasks[i];
       let assigneeId = null;
-      if (t.assignee_name && t.assignee_name !== "null") {
+
+      // Attemp to resolve assignee name to real user id if possible
+      if (task.assignee && task.assignee !== "null") {
         const { data: users } = await supabaseAdmin
           .from("users")
           .select("id")
-          .ilike("name", `%${t.assignee_name}%`)
+          .ilike("name", `%${task.assignee}%`)
           .limit(1);
           
         if (users && users.length > 0) {
@@ -108,15 +72,17 @@ OUTPUT FORMAT (STRICT JSON):
       tasksToInsert.push({
         workspace_id: workspaceId,
         meeting_id: meetingId,
-        title: t.title,
-        assignee_name: t.assignee_name !== "null" ? t.assignee_name : null,
+        title: task.title,
+        assignee_name: task.assignee !== "null" ? task.assignee : null,
         assignee_id: assigneeId,
-        due_date: null,
-        status: "Backlog", 
+        due_date: task.deadline || null,
+        priority: task.priority || "medium",
+        status: task.confidence >= 0.7 ? "Backlog" : "Review", 
         source_type: "AI",
-        confidence: 1.0,
-        transcript_timestamp: null,
-        approved: false
+        confidence: task.confidence || 0.5,
+        transcript_timestamp: task.source_timestamp_ms ? String(task.source_timestamp_ms) : null,
+        approved: false, // AI tasks always start unapproved
+        position: i
       });
     }
 
@@ -129,11 +95,12 @@ OUTPUT FORMAT (STRICT JSON):
     }
 
     await supabaseAdmin.from("meetings").update({ status: "completed" }).eq("id", meetingId);
-    return tasksToInsert;
+    return tasksToInsert.length;
   } catch (error) {
     console.error("Critical error in extractTasks:", error);
     await supabaseAdmin.from("meetings").update({ status: "failed" }).eq("id", meetingId);
     throw error;
   }
 }
+
 

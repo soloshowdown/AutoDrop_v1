@@ -64,7 +64,7 @@ export async function fetchLiveMeetings(workspaceId: string): Promise<Meeting[]>
 export async function getMeetingById(id: string): Promise<Meeting | null> {
   const { data: meeting, error: meetingError } = await supabase
     .from("meetings")
-    .select("*, transcripts (*)")
+    .select("*, transcripts (*), tasks (*)")
     .eq("id", id)
     .single();
 
@@ -82,6 +82,22 @@ export async function getMeetingById(id: string): Promise<Meeting | null> {
       text: t.text,
       isActionable: t.is_actionable,
       taskId: t.task_id,
+    })),
+    // Map tasks using the existing taskService logic if needed, 
+    // but here we can just do a basic map for now to preserve types.
+    // Normalized tasks are important for the UI.
+    tasks: (meeting.tasks ?? []).map((t: any) => ({
+      id: String(t.id),
+      title: String(t.title),
+      status: t.status,
+      priority: t.priority,
+      dueDate: t.due_date,
+      assignee: t.assignee_name,
+      assigneeId: t.assignee_id,
+      meetingId: t.meeting_id,
+      sourceType: t.source_type,
+      approved: !!t.approved,
+      confidence: t.confidence,
     })),
   };
 }

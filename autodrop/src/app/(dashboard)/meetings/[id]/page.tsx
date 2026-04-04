@@ -60,17 +60,19 @@ export default function MeetingDetailPage() {
   }
 
   const transcript = meeting.transcript ?? []
-  // Map extracted tasks to Task type
-  const initialTasks: Task[] = (meeting.extractedTasks ?? []).map((task, index) => ({
-    id: `${meeting.id}-${index}`,
-    title: task.title,
-    status: "To Do",
-    assignee: task.assignee,
-    dueDate: task.deadline ?? undefined,
+  // Real tasks from the meeting object (which now fetches from the tasks table)
+  const initialTasks: Task[] = ((meeting as any).tasks ?? []).map((t: any) => ({
+    id: String(t.id),
+    title: t.title,
+    status: t.status || "Review",
+    priority: t.priority || "medium",
+    dueDate: t.dueDate || undefined,
+    assignee: t.assignee || undefined,
+    assigneeId: t.assigneeId || undefined,
     meetingId: meeting.id,
-    sourceType: "AI",
-    priority: task.priority || "medium",
-    approved: false,
+    sourceType: t.sourceType || "AI",
+    approved: !!t.approved,
+    confidence: t.confidence,
   }))
 
   return (

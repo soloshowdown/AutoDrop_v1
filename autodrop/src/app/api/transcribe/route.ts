@@ -30,10 +30,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "File and meetingId are required" }, { status: 400 });
     }
 
-    // 1. Upload to Supabase Storage - bucket "meetings"
+    // 1. Upload to Supabase Storage - bucket "meetings" at path recordings/{userId}/{meeting_id}.{ext}
     const buffer = Buffer.from(await file.arrayBuffer());
     
-    // 1. Check file size against OpenAI Whisper limits (25MB)
+    // Check file size against OpenAI Whisper limits (25MB)
     if (buffer.length > MAX_WHISPER_SIZE) {
       await supabaseAdmin.from("meetings").update({ status: "failed" }).eq("id", meetingId);
       return NextResponse.json({ 
@@ -41,7 +41,8 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    const storagePath = `recordings/${meetingId}/${file.name}`;
+    const fileExt = file.name.split('.').pop();
+    const storagePath = `recordings/${userId}/${meetingId}.${fileExt}`;
     
     const { error: uploadError } = await supabaseAdmin.storage
       .from("meetings")
@@ -56,19 +57,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to upload file to storage" }, { status: 500 });
     }
 
-    // Update status to "uploaded"
-    await supabaseAdmin.from("meetings").update({ status: "uploaded" }).eq("id", meetingId);
+    // 2. Set status to transcribing before calling Whisper
+    await supabaseAdmin.from("meetings").update({ 
+        status: "transcribing",
+        file_path: storagePath 
+    }).eq("id", meetingId);
 
-    // 2. Transcription with Whisper
-    // If > 25MB, we should split it. For now, let's assume we need to handle it.
-    // Simplifying: we'll use tmp file for OpenAI.
+    // 3. Transcription with Whisper
     const tmpDir = process.platform === "win32" ? path.join(process.cwd(), "tmp") : "/tmp";
     if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
     
     const filePath = path.join(tmpDir, `${Date.now()}-${file.name}`);
     await fs.promises.writeFile(filePath, buffer);
-
-    await supabaseAdmin.from("meetings").update({ status: "transcribing" }).eq("id", meetingId);
 
     const transcription = await openai.audio.transcriptions.create({
       file: fs.createReadStream(filePath),
@@ -77,20 +77,19 @@ export async function POST(req: Request) {
     });
 
     const transcriptText = transcription.text || "";
-    // Note: verbose_json provides words array with timestamps
     const words = (transcription as any).words || [];
 
-    // 3. Save transcript text + words JSON to transcripts table
+    // 4. Save transcript
     const { error: tsError } = await supabaseAdmin.from("transcripts").insert({
       meeting_id: meetingId,
-      speaker: "System", // Or try to detect
+      speaker: "System",
       text: transcriptText,
       words: words
     });
 
     if (tsError) console.error("Error saving transcript:", tsError.message);
 
-    // 4. Update status to "transcribed"
+    // 5. Update status to transcribed (intermediate)
     const { data: meeting } = await supabaseAdmin
       .from("meetings")
       .update({ status: "transcribed" })
@@ -98,7 +97,7 @@ export async function POST(req: Request) {
       .select("workspace_id")
       .single();
 
-    // 5. Trigger extraction step
+    // 6. Trigger extraction (this updates status to extracting then completed)
     if (meeting?.workspace_id) {
         await extractTasks(meetingId, transcriptText, meeting.workspace_id);
     }
@@ -108,7 +107,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       meeting_id: meetingId, 
-      transcript_preview: transcriptText.substring(0, 200) 
+      success: true 
     });
 
   } catch (error) {

@@ -175,6 +175,36 @@ export async function createTaskIfUnique(input: {
   return true;
 }
 
+/**
+ * Fetch all tasks for a specific meeting, including unapproved AI tasks.
+ */
+export async function getTasksByMeeting(meetingId: string): Promise<Task[]> {
+  const { data, error } = await supabase
+    .from("tasks")
+    .select("*, assignee:users!assignee_id(*)")
+    .eq("meeting_id", meetingId)
+    .order("position", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching meeting tasks:", error.message);
+    throw error;
+  }
+
+  return (data ?? []).map((r) => normalizeTask(r));
+}
+
+/**
+ * Update a task's column (status).
+ */
+export async function updateTaskColumn(taskId: string, column: string): Promise<void> {
+  const { error } = await supabase
+    .from("tasks")
+    .update({ status: column })
+    .eq("id", taskId);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function updateTask(
   taskId: string,
   input: {
