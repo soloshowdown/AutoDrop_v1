@@ -81,9 +81,7 @@ export async function POST(req: Request) {
       meeting_id: meetingId,
       speaker: "System", // Or try to detect
       text: transcriptText,
-      time: "00:00",
-      words: words,
-      is_actionable: false
+      words: words
     });
 
     if (tsError) console.error("Error saving transcript:", tsError.message);

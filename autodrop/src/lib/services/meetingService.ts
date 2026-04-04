@@ -128,7 +128,7 @@ export async function fetchMeetingByRoomId(roomId: string): Promise<Meeting | nu
   }
 }
 
-export async function setMeetingStatus(meetingId: string, status: "processing" | "live" | "completed" | "failed", duration?: string): Promise<Meeting | null> {
+export async function setMeetingStatus(meetingId: string, status: "processing" | "live" | "extracting" | "completed" | "failed", duration?: string): Promise<Meeting | null> {
   try {
     const response = await fetch(`/api/meetings/${meetingId}/status`, {
       method: "PATCH",

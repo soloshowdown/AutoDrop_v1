@@ -43,7 +43,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: "Missing meeting id" }, { status: 400 });
     }
 
-    if (!status || !["processing", "live", "completed", "failed"].includes(status)) {
+    if (!status || !["processing", "live", "extracting", "completed", "failed"].includes(status)) {
       return NextResponse.json({ error: "Invalid meeting status" }, { status: 400 });
     }
 

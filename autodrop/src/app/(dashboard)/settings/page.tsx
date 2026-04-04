@@ -6,10 +6,45 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "next-themes"
 import { Switch } from "@/components/ui/switch"
-import React from "react"
+import React, { useState, useEffect } from "react"
+import { useUser } from "@clerk/nextjs"
+import { toast } from "sonner"
+import { Loader2 } from "lucide-react"
 
 export default function SettingsPage() {
   const { theme, setTheme } = useTheme()
+  const { user, isLoaded } = useUser()
+  const [name, setName] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    if (user?.firstName) {
+      setName(user.firstName)
+    }
+  }, [user])
+
+  const handleSaveProfile = async () => {
+    if (!user) return
+    setIsSaving(true)
+    try {
+      await user.update({ firstName: name })
+      
+      const response = await fetch("/api/user/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name })
+      })
+
+      if (!response.ok) throw new Error("Failed to update profile in database")
+      
+      toast.success("Profile updated successfully")
+    } catch (error) {
+      toast.error("Failed to update profile")
+      console.error(error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-8 max-w-4xl">
@@ -27,13 +62,25 @@ export default function SettingsPage() {
           <CardContent className="space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="name">Name</Label>
-              <Input id="name" defaultValue="John Doe" />
+              <Input 
+                id="name" 
+                value={name} 
+                onChange={(e) => setName(e.target.value)} 
+                disabled={!isLoaded || isSaving}
+              />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" defaultValue="m@example.com" disabled />
+              <Input 
+                id="email" 
+                value={user?.primaryEmailAddress?.emailAddress || ""} 
+                disabled 
+              />
             </div>
-            <Button>Save Changes</Button>
+            <Button onClick={handleSaveProfile} disabled={!isLoaded || isSaving}>
+              {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+              Save Changes
+            </Button>
           </CardContent>
         </Card>
 

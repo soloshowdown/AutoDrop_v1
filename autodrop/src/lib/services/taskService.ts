@@ -107,12 +107,12 @@ export async function createTask(input: {
   sourceType?: "AI" | "User";
   transcriptTimestamp?: string;
   approved?: boolean;
+  created_by?: string;
 }): Promise<void> {
   const { data: task, error } = await supabase.from("tasks").insert({
     workspace_id: input.workspaceId,
     title: input.title,
     status: input.status ?? "To Do",
-    priority: input.priority ?? "medium",
     due_date: input.dueDate ?? null,
     assignee_id: input.assigneeId ?? null,
     meeting_id: input.meetingId ?? null,
@@ -120,6 +120,7 @@ export async function createTask(input: {
     source_type: input.sourceType ?? "User",
     transcript_timestamp: input.transcriptTimestamp ?? null,
     approved: input.approved ?? (input.sourceType === "AI" ? false : true),
+    created_by: input.created_by ?? null,
   }).select().single();
 
   if (error) throw new Error(error.message);
@@ -191,7 +192,6 @@ export async function updateTask(
 
   if (input.title) updateData.title = input.title;
   if (input.status) updateData.status = input.status;
-  if (input.priority) updateData.priority = input.priority;
   if (input.dueDate) updateData.due_date = input.dueDate;
   if (input.assigneeId !== undefined) updateData.assignee_id = input.assigneeId || null;
   if (input.meetingTitle !== undefined) updateData.meeting_title = input.meetingTitle || null;

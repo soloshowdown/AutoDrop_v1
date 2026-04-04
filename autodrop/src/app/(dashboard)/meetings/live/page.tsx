@@ -10,6 +10,7 @@ import { createLiveMeeting, fetchMeetingByRoomId, setMeetingStatus } from "@/lib
 import { Task, TranscriptSnippet } from "@/lib/types";
 import { approveTask, deleteTask, fetchPendingTasks } from "@/lib/services/taskService";
 import { Mic, MicOff, Video, StopCircle, Loader2, Zap, Check } from "lucide-react";
+import AIProcessingOverlay from "@/components/ai-processing/AIProcessingOverlay";
 
 export default function LiveMeetingPage() {
   const router = useRouter();
@@ -25,6 +26,7 @@ export default function LiveMeetingPage() {
   const [userName, setUserName] = useState("AutoDrop User");
   const [isRecording, setIsRecording] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [showAIOverlay, setShowAIOverlay] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const hasJoinedFromQueryRef = useRef(false);
   const zegoRef = useRef<any>(null);
@@ -199,43 +201,13 @@ export default function LiveMeetingPage() {
       return;
     }
 
-    setIsProcessingChunk(true);
     const timestamp = new Date().toISOString();
-
-    try {
-      const response = await fetch("/api/meetings/live/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          workspaceId: currentWorkspace.id,
-          meetingId: liveMeetingId,
-          speaker: userName.trim() || "Speaker",
-          text: text,
-          time: timestamp,
-        }),
-      });
-
-      const payload = await response.json();
-      if (!response.ok) {
-        throw new Error(payload.error || "Task extraction failed");
-      }
-
-      if (payload.transcript) {
-        setLiveTranscript((prev) => [...prev, payload.transcript]);
-      }
-
-      if (Array.isArray(payload.tasks) && payload.tasks.length > 0) {
-        await loadWorkspaceData();
-        toast.success(`Extracted ${payload.tasks.length} new insight(s)!`, {
-          icon: "⚡",
-        });
-      }
-    } catch (error) {
-      console.error("Live extract error:", error);
-      // Don't toast for everything in real-time to avoid spam
-    } finally {
-      setIsProcessingChunk(false);
-    }
+    
+    // Accrue local transcript
+    setLiveTranscript((prev) => [
+      ...prev, 
+      { speaker: userName.trim() || "Speaker", text, time: timestamp }
+    ]);
   };
 
   const handleStartRecording = () => {
@@ -326,22 +298,48 @@ export default function LiveMeetingPage() {
     try {
       handleStopRecording();
 
-      const result = await setMeetingStatus(liveMeetingId, "completed", "Live session ended");
-      if (!result) {
-        throw new Error("Failed to finalize live meeting");
-      }
+      // Collect full transcript
+      const fullText = liveTranscript.map(t => `${t.speaker}: ${t.text}`).join("\n");
+      const pendingBuffer = transcriptBufferRef.current.trim();
+      const finalText = fullText + (pendingBuffer ? `\n${userName.trim() || 'Speaker'}: ${pendingBuffer}` : "");
 
-      toast.success("Live meeting saved successfully.");
-      setLiveMeetingId(null);
-      setLiveTranscript([]);
-      setLiveTasks([]);
-      router.push("/meetings");
+      // Signal the overlay and optimistic DB state
+      await setMeetingStatus(liveMeetingId, "extracting", "Live session ended");
+      setShowAIOverlay(true);
+      
+      // Fire the extraction in the background. The overlay will poll the DB status.
+      fetch("/api/meetings/live/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId: currentWorkspace?.id,
+          meetingId: liveMeetingId,
+          fullTranscript: finalText
+        }),
+      }).catch(err => {
+         console.error("AI extraction network error:", err);
+         toast.error("Extraction failed to start.");
+         setShowAIOverlay(false);
+      });
+
     } catch (error) {
       console.error("Failed to end live meeting:", error);
       toast.error(error instanceof Error ? error.message : "Could not end live meeting");
-    } finally {
       setIsEnding(false);
     }
+  };
+
+  const handleProcessingComplete = () => {
+    setShowAIOverlay(false);
+    setLiveMeetingId(null);
+    setLiveTranscript([]);
+    setLiveTasks([]);
+    if (liveMeetingId) {
+      router.push(`/meetings/${liveMeetingId}`);
+    } else {
+      router.push("/meetings");
+    }
+    toast.success("Intelligence successfully gathered.");
   };
 
   const handleApproveLiveTask = async (taskId: string) => {
@@ -365,6 +363,11 @@ export default function LiveMeetingPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <AIProcessingOverlay 
+        isOpen={showAIOverlay} 
+        meetingId={liveMeetingId} 
+        onComplete={handleProcessingComplete} 
+      />
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black tracking-tight flex items-center gap-3">

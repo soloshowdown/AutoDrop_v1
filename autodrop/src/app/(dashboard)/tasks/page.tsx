@@ -12,6 +12,7 @@ import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
 import { PendingTasks } from "@/components/kanban/PendingTasks"
 import { useRef } from "react"
 import { Sparkles, Plus, Filter, Download, Users } from "lucide-react"
+import { useUser } from "@clerk/nextjs"
 import {
   Dialog,
   DialogContent,
@@ -33,6 +34,7 @@ import {
 
 export default function KanbanBoardPage() {
   const { currentWorkspace, isLoading: isWorkspaceLoading } = useWorkspace()
+  const { user } = useUser()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [teamMembers, setTeamMembers] = useState<any[]>([])
@@ -91,66 +93,12 @@ export default function KanbanBoardPage() {
 
     void loadTasks()
     void loadTeamMembers()
-
-    // Subscribe to real-time changes
-    const subscription = subscribeToTasks(currentWorkspace.id, (payload) => {
-      const isMockDataActive = (prev: Task[]) => prev.some(t => t.id.startsWith('mock-'));
-
-      if (payload.eventType === "INSERT") {
-        const newTask = payload.new as Task
-        if (newTask.approved) {
-          setTasks((prev) => {
-            const filtered = prev.filter(t => !t.id.startsWith('mock-'))
-            if (filtered.find((t) => t.id === newTask.id)) return prev
-            const combined = [...filtered, newTask]
-            prevTasksCount.current = combined.length
-            return combined
-          })
-          toast.info("New task added")
-        }
-      } else if (payload.eventType === "UPDATE") {
-        const updatedTask = payload.new as Task
-        setTasks((prev) => {
-          const filtered = prev.filter(t => !t.id.startsWith('mock-'))
-          const exists = filtered.find(t => t.id === updatedTask.id);
-          
-          if (updatedTask.approved) {
-            let result;
-            if (exists) {
-              result = filtered.map(t => t.id === updatedTask.id ? updatedTask : t);
-            } else {
-              result = [...filtered, updatedTask];
-              toast.info("A task has been approved and added to your board.");
-            }
-            prevTasksCount.current = result.length;
-            return result;
-          } else {
-            // Task unapproved or was moved out of view
-            const result = filtered.filter(t => t.id !== updatedTask.id);
-            // If we filtered out the last real task, revert to mock if desired, or stay empty
-            if (result.length === 0) return [];
-            return result;
-          }
-        })
-      } else if (payload.eventType === "DELETE") {
-        const deletedId = payload.old.id
-        setTasks((prev) => {
-          const result = prev.filter((t) => t.id !== deletedId);
-          if (result.length === 0) return [];
-          return result;
-        })
-      }
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
   }, [currentWorkspace?.id])
 
-  // Polling every 5 seconds for tasks (fallback for real-time)
+  // Polling every 3 seconds for tasks
   useEffect(() => {
     if (!currentWorkspace?.id) return
-    const interval = setInterval(() => loadTasks(), 15000)
+    const interval = setInterval(() => loadTasks(), 3000)
     return () => clearInterval(interval)
   }, [currentWorkspace?.id])
 
@@ -274,13 +222,31 @@ export default function KanbanBoardPage() {
           <KanbanBoard
             tasks={tasks}
             onTaskStatusChange={async (taskId, status) => {
-              await updateTaskStatus(taskId, status)
-              await loadTasks()
+              const previousTasks = [...tasks];
+              setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status } : t));
+              try {
+                await updateTaskStatus(taskId, status);
+                toast.success("Task updated");
+                await loadTasks();
+              } catch (error) {
+                setTasks(previousTasks);
+                toast.error("Failed to update task status");
+              }
             }}
             onAddTask={async (title, status) => {
-              if (!title.trim() || !currentWorkspace?.id) return
-              await createTask({ workspaceId: currentWorkspace.id, title, status })
-              await loadTasks()
+              if (!title.trim() || !currentWorkspace?.id || !user?.id) return;
+              try {
+                await createTask({ 
+                  workspaceId: currentWorkspace.id, 
+                  title, 
+                  status,
+                  created_by: user.id 
+                });
+                toast.success("Task added");
+                await loadTasks();
+              } catch (error) {
+                toast.error("Failed to add task");
+              }
             }}
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}

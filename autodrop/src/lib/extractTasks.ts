@@ -3,6 +3,17 @@ import { ExtractedTask } from "@/lib/types";
 import { bulkInsertTasks } from "@/lib/services/taskService";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
+async function getTeamMembers(workspaceId: string) {
+  const { data, error } = await supabaseAdmin
+    .from("workspace_members")
+    .select("user_id, users!inner(name)")
+    .eq("workspace_id", workspaceId);
+    
+  if (error || !data) return ["Kunal", "Vaibhav", "Rahul", "Sumit"];
+  const names = data.map((d: any) => d.users?.name).filter(Boolean);
+  return names.length > 0 ? names : ["Kunal", "Vaibhav", "Rahul", "Sumit"];
+}
+
 /**
  * Extracts tasks from a full transcript using GPT-4o.
  */
@@ -16,17 +27,45 @@ export async function extractTasks(meetingId: string, transcriptText: string, wo
       apiKey: process.env.OPENAI_API_KEY,
     });
 
-    const systemPrompt = `You are an expert meeting analyst. Extract every action item, task, deadline, and commitment from the transcript.
-Return ONLY a valid JSON object with a "tasks" key containing an array of objects.
-Each object must have exactly these fields:
+    const teamMembersList = await getTeamMembers(workspaceId);
+
+    const systemPrompt = `You are an AI assistant that extracts tasks from a team meeting transcript.
+
+Each line is in format:
+"Speaker: message"
+
+---
+
+GOAL:
+Extract tasks and assign them to the correct team member.
+
+---
+
+RULES:
+
+1. If speaker says "I will..." → assign task to speaker
+2. If speaker mentions a person (e.g., "Vaibhav, do this") → assign to that person
+3. If someone agrees ("I'll do it") → assign to that speaker
+4. If no clear assignee → assignee = null
+5. Only assign tasks to valid team members
+
+---
+
+TEAM MEMBERS:
+${JSON.stringify(teamMembersList)}
+
+---
+
+OUTPUT FORMAT (STRICT JSON):
+
 {
-  "title": string,          // imperative sentence e.g. 'Fix login bug on mobile'
-  "assignee": string|null,  // name if mentioned, else null
-  "deadline": string|null,  // ISO date YYYY-MM-DD if mentioned, else null
-  "priority": "high"|"medium"|"low",  // infer from urgency
-  "confidence": number,     // 0.0 to 1.0, how explicitly was this committed to
-  "source_timestamp_ms": number,  // ms in transcript where this was mentioned
-  "key_point": boolean      // true if major decision, not just a task
+  "tasks": [
+    {
+      "title": "task title",
+      "assignee_name": "exact team member name or null",
+      "assigned_by": "speaker"
+    }
+  ]
 }`;
 
     await supabaseAdmin.from("meetings").update({ status: "extracting" }).eq("id", meetingId);
@@ -35,7 +74,7 @@ Each object must have exactly these fields:
       model: "gpt-4o",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: transcriptText }
+        { role: "user", content: "TRANSCRIPT:\n" + transcriptText }
       ],
       response_format: { type: "json_object" },
     });
@@ -50,21 +89,36 @@ Each object must have exactly these fields:
       throw new Error("AI output parsing failed");
     }
 
-    // Map to Supabase schema and apply confidence logic
-    const tasksToInsert = tasks.map(t => ({
-      workspace_id: workspaceId,
-      meeting_id: meetingId,
-      title: t.title,
-      assignee_name: t.assignee, 
-      due_date: t.deadline,
-      priority: t.priority || "medium",
-      status: t.confidence >= 0.7 ? "Backlog" : "To Do", 
-      source_type: "AI",
-      confidence: t.confidence,
-      transcript_timestamp: t.source_timestamp_ms ? String(t.source_timestamp_ms) : null,
-      approved: false, 
-      metadata: { key_point: t.key_point }
-    }));
+    const tasksToInsert = [];
+    
+    for (const t of tasks) {
+      let assigneeId = null;
+      if (t.assignee_name && t.assignee_name !== "null") {
+        const { data: user } = await supabaseAdmin
+          .from("users")
+          .select("id")
+          .ilike("name", `%${t.assignee_name}%`)
+          .single();
+          
+        if (user) {
+          assigneeId = user.id;
+        }
+      }
+
+      tasksToInsert.push({
+        workspace_id: workspaceId,
+        meeting_id: meetingId,
+        title: t.title,
+        assignee_name: t.assignee_name !== "null" ? t.assignee_name : null,
+        assignee_id: assigneeId,
+        due_date: null,
+        status: "Backlog", 
+        source_type: "AI",
+        confidence: 1.0,
+        transcript_timestamp: null,
+        approved: false
+      });
+    }
 
     if (tasksToInsert.length > 0) {
       const { error: insertError } = await supabaseAdmin.from("tasks").insert(tasksToInsert);
@@ -81,20 +135,5 @@ Each object must have exactly these fields:
     await supabaseAdmin.from("meetings").update({ status: "failed" }).eq("id", meetingId);
     throw error;
   }
-}
-
-
-// Keep existing helper if needed for live chunks, but update it to be consistent
-export async function extractTasksFromChunk(speechText: string, speaker: string) {
-  // This is now secondary but we'll keep it for live chunks if still used
-  // and ensure it's simple.
-  return { tasks: [] }; 
-}
-
-// Keeping this for backward compatibility if used in transcribe route initially
-export async function segmentTranscriptBySpeaker(transcript: string) {
-    // This is essentially what extractTasks does now but focused on segments
-    // For now, let's keep a simplified version or just use extractTasks
-    return { segments: [], tasks: [] };
 }
 
