@@ -103,9 +103,7 @@ export async function createTask(input: {
   dueDate?: string;
   assigneeId?: string;
   meetingId?: string;
-  meetingTitle?: string;
   sourceType?: "AI" | "User";
-  transcriptTimestamp?: string;
   approved?: boolean;
 }): Promise<void> {
   const { data: task, error } = await supabase.from("tasks").insert({
@@ -115,9 +113,7 @@ export async function createTask(input: {
     due_date: input.dueDate ?? null,
     assignee_id: input.assigneeId ?? null,
     meeting_id: input.meetingId ?? null,
-    meeting_title: input.meetingTitle ?? null,
     source_type: input.sourceType ?? "User",
-    transcript_timestamp: input.transcriptTimestamp ?? null,
     approved: input.approved ?? (input.sourceType === "AI" ? false : true),
   }).select().single();
 
@@ -211,9 +207,7 @@ export async function updateTask(
     priority?: "low" | "medium" | "high";
     dueDate?: string;
     assigneeId?: string;
-    meetingTitle?: string;
     sourceType?: "AI" | "User";
-    transcriptTimestamp?: string;
   }
 ): Promise<void> {
   const updateData: Record<string, any> = {};
@@ -222,9 +216,7 @@ export async function updateTask(
   if (input.status) updateData.status = input.status;
   if (input.dueDate) updateData.due_date = input.dueDate;
   if (input.assigneeId !== undefined) updateData.assignee_id = input.assigneeId || null;
-  if (input.meetingTitle !== undefined) updateData.meeting_title = input.meetingTitle || null;
   if (input.sourceType !== undefined) updateData.source_type = input.sourceType;
-  if (input.transcriptTimestamp !== undefined) updateData.transcript_timestamp = input.transcriptTimestamp || null;
 
   const { error } = await supabase
     .from("tasks")

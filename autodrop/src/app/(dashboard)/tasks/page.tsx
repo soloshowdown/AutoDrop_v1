@@ -45,8 +45,6 @@ export default function KanbanBoardPage() {
   const [editDueDate, setEditDueDate] = useState("")
   const [editAssigneeId, setEditAssigneeId] = useState("")
   const [editSourceType, setEditSourceType] = useState<"AI" | "User">("User")
-  const [editMeetingTitle, setEditMeetingTitle] = useState("")
-  const [editTranscriptTimestamp, setEditTranscriptTimestamp] = useState("")
   const prevTasksCount = useRef(0)
 
   // ---- Add Task dialog state ----
@@ -133,8 +131,6 @@ export default function KanbanBoardPage() {
     setEditDueDate(task.dueDate ? task.dueDate.split("T")[0] : "")
     setEditAssigneeId(task.assigneeId || "")
     setEditSourceType(task.sourceType || "User")
-    setEditMeetingTitle(task.meetingTitle || "")
-    setEditTranscriptTimestamp(task.transcriptTimestamp || "")
   }
 
   const handleSaveEdit = async () => {
@@ -151,8 +147,6 @@ export default function KanbanBoardPage() {
         priority: editPriority,
         assigneeId: editAssigneeId || undefined,
         sourceType: editSourceType,
-        meetingTitle: editMeetingTitle || undefined,
-        transcriptTimestamp: editTranscriptTimestamp || undefined,
       })
       setEditingTask(null)
       toast.success("Task updated successfully")
@@ -328,37 +322,17 @@ export default function KanbanBoardPage() {
                 onChange={(e) => setEditDueDate(e.target.value)}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="task-source">Source Type</Label>
-                <Select value={editSourceType} onValueChange={(v) => setEditSourceType(v as "AI" | "User")}>
-                  <SelectTrigger id="task-source">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AI">AI Generated</SelectItem>
-                    <SelectItem value="User">User Added</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="task-timestamp">Timestamp</Label>
-                <Input
-                  id="task-timestamp"
-                  placeholder="e.g. 12:45"
-                  value={editTranscriptTimestamp}
-                  onChange={(e) => setEditTranscriptTimestamp(e.target.value)}
-                />
-              </div>
-            </div>
             <div>
-              <Label htmlFor="task-meeting">Source Meeting</Label>
-              <Input
-                id="task-meeting"
-                placeholder="Meeting title"
-                value={editMeetingTitle}
-                onChange={(e) => setEditMeetingTitle(e.target.value)}
-              />
+              <Label htmlFor="task-source">Source Type</Label>
+              <Select value={editSourceType} onValueChange={(v) => setEditSourceType(v as "AI" | "User")}>
+                <SelectTrigger id="task-source">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="AI">AI Generated</SelectItem>
+                  <SelectItem value="User">User Added</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <DialogFooter>
