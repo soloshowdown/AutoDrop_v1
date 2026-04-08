@@ -4,7 +4,7 @@ import { Task, TaskStatus } from "@/lib/types";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useDroppable } from "@dnd-kit/core";
 import { TaskCard } from "./TaskCard";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -12,12 +12,15 @@ import { motion, AnimatePresence } from "framer-motion";
 interface KanbanColumnProps {
   column: { id: TaskStatus; title: string };
   tasks: Task[];
-  onAddTask?: () => void;
+  onAddTask?: (title: string) => void;
   onEditTask?: (task: Task) => void;
   onDeleteTask?: (taskId: string) => Promise<void> | void;
 }
 
 export function KanbanColumn({ column, tasks, onAddTask, onEditTask, onDeleteTask }: KanbanColumnProps) {
+  const [isAdding, setIsAdding] = useState(false);
+  const [newTitle, setNewTitle] = useState("");
+
   const taskIds = useMemo(() => tasks.map((task) => task.id), [tasks]);
 
   const { setNodeRef } = useDroppable({
@@ -27,6 +30,16 @@ export function KanbanColumn({ column, tasks, onAddTask, onEditTask, onDeleteTas
       column,
     },
   });
+
+  const handleAdd = async () => {
+    if (!newTitle.trim()) {
+      setIsAdding(false);
+      return;
+    }
+    await onAddTask?.(newTitle.trim());
+    setNewTitle("");
+    setIsAdding(false);
+  };
 
   return (
     <div
@@ -39,8 +52,13 @@ export function KanbanColumn({ column, tasks, onAddTask, onEditTask, onDeleteTas
             {tasks.length}
           </span>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onAddTask}>
-           <Plus className="h-4 w-4" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="h-8 w-8" 
+          onClick={() => setIsAdding(!isAdding)}
+        >
+           <Plus className={isAdding ? "h-4 w-4 rotate-45 transition-transform" : "h-4 w-4 transition-transform"} />
         </Button>
       </div>
 
@@ -48,6 +66,30 @@ export function KanbanColumn({ column, tasks, onAddTask, onEditTask, onDeleteTas
         ref={setNodeRef}
         className="flex-1 p-3 flex flex-col gap-3 overflow-y-auto"
       >
+        <AnimatePresence>
+          {isAdding && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-background rounded-xl border p-3 shadow-sm mb-2"
+            >
+              <input
+                autoFocus
+                className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+                placeholder="Task title..."
+                value={newTitle}
+                onChange={(e) => setNewTitle(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleAdd();
+                  if (e.key === "Escape") setIsAdding(false);
+                }}
+                onBlur={handleAdd}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
           <AnimatePresence>
             {tasks.map((task) => (

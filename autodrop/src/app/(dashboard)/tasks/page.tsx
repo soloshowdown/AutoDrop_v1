@@ -63,7 +63,7 @@ export default function KanbanBoardPage() {
   const loadTasks = async () => {
     if (!currentWorkspace?.id) return
     try {
-      setLoading(true)
+      if (tasks.length === 0) setLoading(true)
       const records = await fetchTasks(currentWorkspace.id)
       
       // If new tasks are detected, show a toast
@@ -285,7 +285,8 @@ export default function KanbanBoardPage() {
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
-                <SelectContent>
+                 <SelectContent>
+                  <SelectItem value="Review">Review</SelectItem>
                   <SelectItem value="Backlog">Backlog</SelectItem>
                   <SelectItem value="To Do">To Do</SelectItem>
                   <SelectItem value="In Progress">In Progress</SelectItem>
@@ -440,7 +441,8 @@ export default function KanbanBoardPage() {
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                   <SelectContent>
+                    <SelectItem value="Review">Review</SelectItem>
                     <SelectItem value="Backlog">Backlog</SelectItem>
                     <SelectItem value="To Do">To Do</SelectItem>
                     <SelectItem value="In Progress">In Progress</SelectItem>
