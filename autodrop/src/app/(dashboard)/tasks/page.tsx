@@ -411,7 +411,6 @@ export default function KanbanBoardPage() {
                       dueDate: newTaskDueDate || undefined,
                       assigneeId: newTaskAssigneeId || undefined,
                       sourceType: "User",
-                      created_by: user.id,
                       approved: true,
                     })
                     toast.success("Task created successfully")
@@ -507,7 +506,6 @@ export default function KanbanBoardPage() {
                     dueDate: newTaskDueDate || undefined,
                     assigneeId: newTaskAssigneeId || undefined,
                     sourceType: "User",
-                    created_by: user.id,
                     approved: true,
                   })
                   toast.success("Task created successfully")
