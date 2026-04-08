@@ -7,6 +7,7 @@ import { LayoutDashboard, Video, KanbanSquare, Settings, Play, Phone, Mail } fro
 import { WorkspaceSwitcher } from "./workspaces/WorkspaceSwitcher"
 import { TeamList } from "./team/TeamList"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { useMeeting } from "@/lib/contexts/MeetingContext"
 import { Badge } from "@/components/ui/badge"
 
 const sidebarItems = [
@@ -45,6 +46,7 @@ const sidebarItems = [
 export default function Sidebar() {
   const pathname = usePathname()
   const { pendingInvitesCount } = useWorkspace()
+  const { isMeetingActive } = useMeeting()
 
   return (
     <div className="hidden border-r bg-muted/40 md:block w-64 flex-shrink-0">
@@ -85,6 +87,11 @@ export default function Sidebar() {
                     <Badge variant="destructive" className="h-5 w-5 rounded-full p-0 flex items-center justify-center text-[10px] animate-pulse">
                       {pendingInvitesCount}
                     </Badge>
+                  )}
+                  {item.href === "/meetings/live" && isMeetingActive && (
+                    <div className="ml-auto">
+                      <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+                    </div>
                   )}
                 </Link>
               )

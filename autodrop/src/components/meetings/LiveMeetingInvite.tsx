@@ -1,60 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
 import { Mic, Phone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
-import { fetchLiveMeetings, subscribeToMeetings } from "@/lib/services/meetingService";
-import { Meeting } from "@/lib/types";
+import { useMeeting } from "@/lib/contexts/MeetingContext";
 
 export function LiveMeetingInvite() {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { currentWorkspace } = useWorkspace();
-  const [liveMeeting, setLiveMeeting] = useState<Meeting | null>(null);
-  const [isVisible, setIsVisible] = useState(false);
+  const { liveMeeting, isPopupVisible, dismissPopup, joinMeeting } = useMeeting();
 
-  useEffect(() => {
-    if (!currentWorkspace?.id) return;
-
-    const checkLiveMeetings = async () => {
-      const meetings = await fetchLiveMeetings(currentWorkspace.id);
-      if (meetings.length > 0) {
-        // If we're already in the live meeting page for this room, don't show the invite
-        const isAlreadyInMeeting = pathname.includes("/meetings/live") && 
-          pathname.includes(meetings[0].roomId || "");
-          
-        if (!isAlreadyInMeeting) {
-          setLiveMeeting(meetings[0]);
-          setIsVisible(true);
-        }
-      } else {
-        setIsVisible(false);
-      }
-    };
-
-    void checkLiveMeetings();
-    const interval = setInterval(checkLiveMeetings, 10000);
-
-    const subscription = subscribeToMeetings(currentWorkspace.id, (payload) => {
-      void checkLiveMeetings();
-    });
-
-    return () => {
-      clearInterval(interval);
-      subscription.unsubscribe();
-    };
-  }, [currentWorkspace?.id, pathname]);
-
-  if (!isVisible || !liveMeeting) return null;
-
-  const handleJoin = () => {
-    if (liveMeeting.roomId) {
-      router.push(`/meetings/live?room=${encodeURIComponent(liveMeeting.roomId)}`);
-      setIsVisible(false);
-    }
-  };
+  if (!isPopupVisible || !liveMeeting) return null;
 
   return (
     <div className="fixed bottom-6 right-6 z-50 animate-in fade-in slide-in-from-bottom-8 duration-500">
@@ -67,7 +21,7 @@ export function LiveMeetingInvite() {
             <Mic className="h-6 w-6 animate-pulse" />
           </div>
           <button 
-            onClick={() => setIsVisible(false)}
+            onClick={dismissPopup}
             className="rounded-full p-1.5 hover:bg-white/5 text-muted-foreground/40 hover:text-foreground transition-colors"
           >
             <X className="h-4 w-4" />
@@ -81,7 +35,7 @@ export function LiveMeetingInvite() {
         </div>
 
         <Button 
-          onClick={handleJoin}
+          onClick={joinMeeting}
           className="w-full h-12 rounded-2xl bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
         >
           <Phone className="mr-2 h-4 w-4" />
