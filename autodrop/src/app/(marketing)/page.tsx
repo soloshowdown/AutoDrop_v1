@@ -56,9 +56,6 @@ export default function LandingPage() {
                   </div>
                   <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3">
                     <div className="h-4 w-24 bg-muted-foreground/20 rounded"></div>
-                    <div className="h-20 bg-primary/10 border border-primary/20 rounded relative">
-                       <div className="absolute -top-2 -right-2 w-4 h-4 rounded-full bg-primary animate-pulse"></div>
-                    </div>
                   </div>
                   <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3 opacity-50">
                     <div className="h-4 w-16 bg-muted-foreground/20 rounded"></div>
