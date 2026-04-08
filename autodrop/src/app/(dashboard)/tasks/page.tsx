@@ -60,10 +60,12 @@ export default function KanbanBoardPage() {
 
   const isAdmin = currentWorkspace?.role === 'admin';
 
+  const isInitialLoad = useRef(true)
+
   const loadTasks = async () => {
     if (!currentWorkspace?.id) return
     try {
-      if (tasks.length === 0) setLoading(true)
+      if (isInitialLoad.current) setLoading(true)
       const records = await fetchTasks(currentWorkspace.id)
       
       // If new tasks are detected, show a toast
@@ -78,7 +80,10 @@ export default function KanbanBoardPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to load tasks")
     } finally {
-      setLoading(false)
+      if (isInitialLoad.current) {
+        setLoading(false)
+        isInitialLoad.current = false
+      }
     }
   }
 
