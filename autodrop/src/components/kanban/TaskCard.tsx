@@ -23,9 +23,9 @@ interface TaskCardProps {
 }
 
 const priorityColors = {
-  low: "bg-green-100 text-green-800",
-  medium: "bg-yellow-100 text-yellow-800",
-  high: "bg-red-100 text-red-800",
+  low: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 shadow-[0_0_12px_-4px_rgba(16,185,129,0.3)]",
+  medium: "bg-amber-500/10 text-amber-500 border-amber-500/20 shadow-[0_0_12px_-4px_rgba(245,158,11,0.3)]",
+  high: "bg-rose-500/10 text-rose-500 border-rose-500/20 shadow-[0_0_12px_-4px_rgba(244,63,94,0.3)]",
 };
 
 export function TaskCard({ task, isOverlay, onEdit, onDelete }: TaskCardProps) {
@@ -69,7 +69,11 @@ export function TaskCard({ task, isOverlay, onEdit, onDelete }: TaskCardProps) {
       {...attributes}
       {...listeners}
     >
-      <CardContent className="p-4 flex flex-col gap-3">
+      <div 
+        className="h-full w-full"
+        onClick={() => onEdit?.(task)}
+      >
+        <CardContent className="p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2 mb-1">
             <div className="flex items-start justify-between gap-2 flex-1">
                <div className="font-bold text-sm leading-snug flex-1 group-hover:text-primary transition-colors line-clamp-2">
@@ -143,7 +147,7 @@ export function TaskCard({ task, isOverlay, onEdit, onDelete }: TaskCardProps) {
              </div>
              
              {task.assignee && (
-                <div className="relative shrink-0">
+                <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
                   <Avatar size="sm" className="h-7 w-7 border-2 border-background shadow-sm hover:scale-110 transition-transform cursor-pointer">
                     <AvatarImage src="" />
                     <AvatarFallback className="text-[9px] font-bold bg-primary/10 text-primary uppercase">
@@ -154,7 +158,8 @@ export function TaskCard({ task, isOverlay, onEdit, onDelete }: TaskCardProps) {
                 </div>
              )}
           </div>
-      </CardContent>
+        </CardContent>
+      </div>
     </Card>
   );
 }

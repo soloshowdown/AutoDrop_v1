@@ -39,7 +39,7 @@ const columns: { id: TaskStatus; title: string }[] = [
 interface KanbanBoardProps {
   tasks: Task[];
   onTaskStatusChange?: (taskId: string, status: TaskStatus) => Promise<void> | void;
-  onAddTask?: (title: string, status: TaskStatus) => Promise<void> | void;
+  onOpenAddDialog?: (status: TaskStatus) => void;
   onEditTask?: (task: Task) => void;
   onDeleteTask?: (taskId: string) => Promise<void> | void;
 }
@@ -47,7 +47,7 @@ interface KanbanBoardProps {
 export function KanbanBoard({ 
   tasks, 
   onTaskStatusChange, 
-  onAddTask,
+  onOpenAddDialog,
   onEditTask,
   onDeleteTask,
 }: KanbanBoardProps) {
@@ -251,9 +251,7 @@ export function KanbanBoard({
                 key={col.id}
                 column={col}
                 tasks={getTasksByColumn(col.id)}
-                onAddTask={async (title) => {
-                  await onAddTask?.(title, col.id);
-                }}
+                onOpenAddDialog={onOpenAddDialog}
                 onEditTask={onEditTask}
                 onDeleteTask={onDeleteTask}
               />

@@ -58,6 +58,11 @@ export default function KanbanBoardPage() {
   const [newTaskAssigneeId, setNewTaskAssigneeId] = useState("")
   const [isAddingTask, setIsAddingTask] = useState(false)
 
+  const handleOpenAddDialog = (status: Task["status"]) => {
+    setNewTaskStatus(status)
+    setShowAddTaskDialog(true)
+  }
+
   const isAdmin = currentWorkspace?.role === 'admin';
 
   const isInitialLoad = useRef(true)
@@ -233,7 +238,7 @@ export default function KanbanBoardPage() {
         ) : loading ? (
           <div className="text-sm text-muted-foreground p-4">Loading tasks...</div>
         ) : (
-          <KanbanBoard
+           <KanbanBoard
             tasks={tasks}
             onTaskStatusChange={async (taskId, status) => {
               const previousTasks = [...tasks];
@@ -247,21 +252,7 @@ export default function KanbanBoardPage() {
                 toast.error("Failed to update task status");
               }
             }}
-            onAddTask={async (title, status) => {
-              if (!title.trim() || !currentWorkspace?.id || !user?.id) return;
-              try {
-                await createTask({ 
-                  workspaceId: currentWorkspace.id, 
-                  title, 
-                  status,
-                  created_by: user.id 
-                });
-                toast.success("Task added");
-                await loadTasks();
-              } catch (error) {
-                toast.error("Failed to add task");
-              }
-            }}
+            onOpenAddDialog={handleOpenAddDialog}
             onEditTask={handleEditTask}
             onDeleteTask={handleDeleteTask}
           />
