@@ -215,6 +215,15 @@ export async function uploadAndProcessMeeting(file: File, workspaceId: string, m
 }
 
 
+export async function deleteMeeting(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("meetings")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw new Error(error.message);
+}
+
 export function subscribeToMeetings(workspaceId: string, onEvent: (payload: any) => void) {
   return supabase
     .channel(`public:meetings:workspace:${workspaceId}`)

@@ -1,23 +1,24 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import Link from "next/link"
-import { Video, CheckCircle2, Clock, ArrowRight } from "lucide-react"
+import { Video, CheckCircle2, Clock, ArrowRight, Mail, Zap } from "lucide-react"
 import { useUser } from "@clerk/nextjs"
 import { useEffect, useMemo, useState } from "react"
-import { fetchLiveMeetings, listMeetings } from "@/lib/services/meetingService"
+import { fetchLiveMeetings, listMeetings, deleteMeeting } from "@/lib/services/meetingService"
 import { fetchTasks } from "@/lib/services/taskService"
 import { Meeting, Task } from "@/lib/types"
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext"
+import { useMeeting } from "@/lib/contexts/MeetingContext"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ActivityFeed } from "@/components/dashboard/ActivityFeed"
 import { toast } from "sonner"
-import { Mail, Zap } from "lucide-react"
 
 export default function DashboardPage() {
   const { user } = useUser()
   const { currentWorkspace, pendingInvitesCount, isLoading: isWorkspaceLoading } = useWorkspace()
+  const { refreshMeetingState } = useMeeting()
   const [meetings, setMeetings] = useState<Meeting[]>([])
   const [liveMeetings, setLiveMeetings] = useState<Meeting[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
@@ -39,9 +40,17 @@ export default function DashboardPage() {
           fetchTasks(currentWorkspace!.id),
           fetchLiveMeetings(currentWorkspace!.id)
         ])
+
+        // Filter live meetings for staleness (4 hours)
+        const now = Date.now();
+        const validLive = fetchedLive.filter(m => {
+          const age = now - new Date(m.date).getTime();
+          return age < 4 * 60 * 60 * 1000; // 4 hours
+        });
+
         setMeetings(fetchedMeetings)
         setTasks(fetchedTasks)
-        setLiveMeetings(fetchedLive)
+        setLiveMeetings(validLive)
       } catch (error) {
         console.error("Error loading dashboard data:", error)
       } finally {
@@ -133,13 +142,33 @@ export default function DashboardPage() {
                     </p>
                  </div>
               </div>
-              <Link 
-                href={`/meetings/live?room=${encodeURIComponent(liveMeetings[0].id)}`}
-                className="inline-flex items-center justify-center h-14 px-8 rounded-2xl bg-emerald-500 text-white font-bold text-base shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all hover:scale-[1.02] active:scale-95"
-              >
-                 Join Live Session
-                 <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
+              <div className="flex flex-col sm:flex-row items-center gap-3">
+                <Button
+                  variant="ghost"
+                  onClick={async () => {
+                    if (confirm("Are you sure you want to cancel this live session? It will be permanently removed.")) {
+                      try {
+                        await deleteMeeting(liveMeetings[0].id);
+                        toast.success("Live session cancelled.");
+                        setLiveMeetings(prev => prev.filter(m => m.id !== liveMeetings[0].id));
+                        refreshMeetingState(); // Sync global popup/sidebar
+                      } catch (err) {
+                        toast.error("Failed to cancel session");
+                      }
+                    }
+                  }}
+                  className="inline-flex items-center justify-center h-14 px-8 rounded-2xl bg-white/5 text-emerald-950 font-bold text-base hover:bg-red-500/10 hover:text-red-600 transition-all"
+                >
+                   Cancel Session
+                </Button>
+                <Link 
+                  href={`/meetings/live?room=${encodeURIComponent(liveMeetings[0].id)}`}
+                  className="inline-flex items-center justify-center h-14 px-8 rounded-2xl bg-emerald-500 text-white font-bold text-base shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all hover:scale-[1.02] active:scale-95"
+                >
+                   Join Live Session
+                   <ArrowRight className="ml-2 h-5 w-5" />
+                </Link>
+              </div>
            </div>
         </div>
       )}

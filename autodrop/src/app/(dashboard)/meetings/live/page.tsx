@@ -6,15 +6,17 @@ import { Input } from "@/components/ui/input";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useWorkspace } from "@/lib/contexts/WorkspaceContext";
-import { createLiveMeeting, fetchMeetingByRoomId, setMeetingStatus } from "@/lib/services/meetingService";
+import { createLiveMeeting, fetchMeetingByRoomId, setMeetingStatus, deleteMeeting } from "@/lib/services/meetingService";
+import { useMeeting } from "@/lib/contexts/MeetingContext";
 import { Task, TranscriptSnippet } from "@/lib/types";
 import { approveTask, deleteTask, fetchPendingTasks } from "@/lib/services/taskService";
-import { Mic, MicOff, Video, StopCircle, Loader2, Zap, Check } from "lucide-react";
+import { Mic, MicOff, Video, StopCircle, Loader2, Zap, Check, X } from "lucide-react";
 import AIProcessingOverlay from "@/components/ai-processing/AIProcessingOverlay";
 
 export default function LiveMeetingPage() {
   const router = useRouter();
   const { currentWorkspace } = useWorkspace();
+  const { refreshMeetingState } = useMeeting();
   const [roomId, setRoomId] = useState("");
   const [joinedRoomId, setJoinedRoomId] = useState("");
   const [liveMeetingId, setLiveMeetingId] = useState<string | null>(null);
@@ -331,6 +333,23 @@ export default function LiveMeetingPage() {
     }
   };
 
+  const handleCancelMeeting = async () => {
+    if (!liveMeetingId) return;
+    
+    if (confirm("Are you sure you want to cancel this meeting? All captured data for this session will be permanently deleted.")) {
+      try {
+        setIsEnding(true);
+        await deleteMeeting(liveMeetingId);
+        toast.success("Meeting cancelled.");
+        refreshMeetingState();
+        router.push("/dashboard");
+      } catch (error) {
+        toast.error("Failed to cancel meeting.");
+        setIsEnding(false);
+      }
+    }
+  };
+
   const handleProcessingComplete = () => {
     setShowAIOverlay(false);
     setLiveMeetingId(null);
@@ -398,6 +417,15 @@ export default function LiveMeetingPage() {
               Stop AI Capture
             </Button>
           )}
+          <Button
+            variant="ghost"
+            onClick={handleCancelMeeting}
+            disabled={isEnding || !liveMeetingId}
+            className="rounded-2xl h-11 px-6 font-bold text-muted-foreground hover:bg-red-500/10 hover:text-red-600"
+          >
+            {isEnding ? <Loader2 className="h-4 w-4 animate-spin" /> : <X className="mr-2 h-4 w-4" />}
+            Cancel Meeting
+          </Button>
           <Button
             variant="ghost"
             onClick={handleEndLiveMeeting}

@@ -12,6 +12,7 @@ interface MeetingContextType {
   isMeetingActive: boolean;
   dismissPopup: () => void;
   joinMeeting: () => void;
+  refreshMeetingState: () => void;
   isLoading: boolean;
 }
 
@@ -126,6 +127,7 @@ export function MeetingProvider({ children }: { children: React.ReactNode }) {
         isMeetingActive, 
         dismissPopup, 
         joinMeeting,
+        refreshMeetingState: () => void checkLiveMeetings(),
         isLoading 
       }}
     >
