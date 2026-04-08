@@ -23,7 +23,7 @@ export function MeetingProvider({ children }: { children: React.ReactNode }) {
   const { currentWorkspace } = useWorkspace();
   const [liveMeeting, setLiveMeeting] = useState<Meeting | null>(null);
   const [isPopupVisible, setIsPopupVisible] = useState(false);
-  const [isDismissed, setIsDismissed] = useState(false);
+  const [dismissedMeetingId, setDismissedMeetingId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const checkLiveMeetings = async () => {
@@ -34,15 +34,20 @@ export function MeetingProvider({ children }: { children: React.ReactNode }) {
 
     try {
       const meetings = await fetchLiveMeetings(currentWorkspace.id);
-      if (meetings.length > 0) {
-        const meeting = meetings[0];
+      // Only consider meetings that have a roomId
+      const validMeetings = meetings.filter(m => !!m.roomId);
+      
+      if (validMeetings.length > 0) {
+        const meeting = validMeetings[0];
         setLiveMeeting(meeting);
         
-        // Only show popup if not already in the meeting page and not dismissed
+        // Only show popup if not already in the meeting page and not dismissed for this specific meeting ID
         const isAlreadyInMeeting = pathname.includes("/meetings/live") && 
                                   pathname.includes(meeting.roomId || "");
         
-        if (!isAlreadyInMeeting && !isDismissed) {
+        const isThisMeetingDismissed = dismissedMeetingId === meeting.id;
+        
+        if (!isAlreadyInMeeting && !isThisMeetingDismissed) {
           setIsPopupVisible(true);
         } else {
           setIsPopupVisible(false);
@@ -50,7 +55,8 @@ export function MeetingProvider({ children }: { children: React.ReactNode }) {
       } else {
         setLiveMeeting(null);
         setIsPopupVisible(false);
-        setIsDismissed(false); // Reset dismissal when no meetings are active
+        // Important: We don't reset dismissedMeetingId here. 
+        // It stays until a NEW meeting with a different ID starts.
       }
     } catch (error) {
       console.error("Error checking live meetings:", error);
@@ -64,7 +70,6 @@ export function MeetingProvider({ children }: { children: React.ReactNode }) {
 
     void checkLiveMeetings();
     
-    // Check every 15 seconds as a fallback
     const interval = setInterval(checkLiveMeetings, 15000);
 
     const subscription = subscribeToMeetings(currentWorkspace.id, () => {
@@ -75,22 +80,24 @@ export function MeetingProvider({ children }: { children: React.ReactNode }) {
       clearInterval(interval);
       subscription.unsubscribe();
     };
-  }, [currentWorkspace?.id, pathname, isDismissed]);
+  }, [currentWorkspace?.id, pathname, dismissedMeetingId]);
 
   const dismissPopup = () => {
-    setIsPopupVisible(false);
-    setIsDismissed(true);
+    if (liveMeeting) {
+      setIsPopupVisible(false);
+      setDismissedMeetingId(liveMeeting.id);
+    }
   };
 
   const joinMeeting = () => {
     if (liveMeeting?.roomId) {
       router.push(`/meetings/live?room=${encodeURIComponent(liveMeeting.roomId)}`);
       setIsPopupVisible(false);
-      setIsDismissed(true); // Don't show the popup again for this meeting after joining
+      setDismissedMeetingId(liveMeeting.id); // Mark as dismissed since we are joining it
     }
   };
 
-  const isMeetingActive = !!liveMeeting;
+  const isMeetingActive = !!liveMeeting && !!liveMeeting.roomId;
 
   return (
     <MeetingContext.Provider 
