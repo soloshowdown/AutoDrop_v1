@@ -40,31 +40,7 @@ export default function LandingPage() {
               <Play className="h-4 w-4" /> Watch Demo
             </Button>
           </div>
-          <div className="mt-12 rounded-xl border bg-muted/20 backdrop-blur-sm p-2 md:p-4 max-w-5xl w-full shadow-2xl relative">
-            <div className="absolute inset-0 bg-gradient-to-t from-background to-transparent pointer-events-none z-10 bottom-0 top-1/2" />
-            <div className="aspect-video bg-muted rounded-lg overflow-hidden border shadow-sm relative flex items-center justify-center">
-              {/* Mock Dashboard Screenshot */}
-              <div className="absolute inset-0 flex flex-col">
-                <div className="h-10 border-b flex items-center px-4 gap-2 bg-background/50">
-                  <div className="flex gap-1.5"><div className="w-3 h-3 rounded-full bg-red-400"></div><div className="w-3 h-3 rounded-full bg-amber-400"></div><div className="w-3 h-3 rounded-full bg-green-400"></div></div>
-                </div>
-                <div className="flex-1 p-8 grid grid-cols-3 gap-6 bg-muted/30">
-                  <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3">
-                    <div className="h-4 w-20 bg-muted-foreground/20 rounded"></div>
-                    <div className="h-20 bg-muted-foreground/10 rounded"></div>
-                    <div className="h-20 bg-muted-foreground/10 rounded"></div>
-                  </div>
-                  <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3">
-                    <div className="h-4 w-24 bg-muted-foreground/20 rounded"></div>
-                  </div>
-                  <div className="rounded-xl border bg-background p-4 shadow-sm flex flex-col gap-3 opacity-50">
-                    <div className="h-4 w-16 bg-muted-foreground/20 rounded"></div>
-                    <div className="h-20 bg-muted-foreground/10 rounded"></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+
         </div>
       </section>
 
